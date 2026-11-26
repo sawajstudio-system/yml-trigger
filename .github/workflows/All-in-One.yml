@@ -1,0 +1,353 @@
+# ════════════════════════════════════════════════════════════════
+# FILE: .github/workflows/story.yml
+# PURPOSE: Sawaj Studio — Hindi Story pipeline (All-in-One)
+# REPOS: Development + yml-trigger (dono ek saath)
+# ════════════════════════════════════════════════════════════════
+name: 🎬 Sawaj Studio — Hindi Story (All-in-One)
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: "Language"
+        default: "hi"
+        required: false
+      duration:
+        description: "Video duration (sec)"
+        default: "20"
+        required: false
+  schedule:
+    - cron: "30 0 * * *"   # 6:00 AM IST daily
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  PYTHON_VERSION: "3.11"
+  LANG_CODE: "hi"
+  TZ: "Asia/Kolkata"
+  # ═══════════════════════════════════════════════════════════════
+  # SECRETS → API keys (repo Settings → Secrets me daalo)
+  # ═══════════════════════════════════════════════════════════════
+  # --- Development/API/AI_Models/ (7 AI files) ---
+  GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}        # gemini.py
+  OPENROUTER_API_KEY:    ${{ secrets.OPENROUTER_API_KEY }}    # openrouter.py
+  GROQ_API_KEY:          ${{ secrets.GROQ_API_KEY }}          # groq.py
+  COHERE_API_KEY:        ${{ secrets.COHERE_API_KEY }}        # cohere.py
+  NVIDIA_API_KEY:        ${{ secrets.NVIDIA_API_KEY }}        # nvidia.py
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }} # cloudflare.py
+  CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}  # cloudflare.py
+  ANGES_API_KEY:         ${{ secrets.ANGES_API_KEY }}         # anges.py
+
+  # --- Development/API/Audio_Text/elevenlabs.py ---
+  ELEVENLABS_API_KEY:    ${{ secrets.ELEVENLABS_API_KEY }}
+
+  # --- Development/API/Video_Sources/ + Music_Sources/ ---
+  PEXELS_API_KEY:        ${{ secrets.PEXELS_API_KEY }}        # pexels_video.py
+  PIXABAY_API_KEY:       ${{ secrets.PIXABAY_API_KEY }}       # pixabay_video.py + pixabay_music.py
+  COVERR_API_KEY:        ${{ secrets.COVERR_API_KEY }}        # coverr.py
+  FREESOUND_API_KEY:     ${{ secrets.FREESOUND_API_KEY }}     # freesound.py
+
+  # --- Development/Uploader/ ---
+  GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}  # story_upload.py
+  CLOUDINARY_URL:           ${{ secrets.CLOUDINARY_URL }}           # cloudinary.py
+
+  # --- Development/Story/Pipeline_Orchestration/composer.py (send_telegram) ---
+  TELEGRAM_API_REPORT_TOKEN:   ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+  TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+
+jobs:
+  # ══════════════════════════════════════════════════════════════
+  # JOB 1: build-story
+  # ──────────────────────────────────────────────────────────────
+  # ENTRY:   Development/Story/Pipeline_Orchestration/composer.py
+  #          → run_pipeline()
+  # OUTPUT:  Development/temp/Final_Story.mp4
+  #          Development/temp/cta_image.png
+  #          Development/temp/voice.mp3
+  # ══════════════════════════════════════════════════════════════
+  build-story:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ────────────────────────────────────────────────────────
+      # STEP 1  →  Checkout Development repo
+      # 📁 Development/  (140 files: API, Assets, Config, Story, URL, Uploader)
+      # ────────────────────────────────────────────────────────
+      - name: 📥 Checkout Development repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/Development
+          token: ${{ secrets.GH_PAT }}
+          path: Development
+
+      # ────────────────────────────────────────────────────────
+      # STEP 2  →  Checkout yml-trigger repo (optional)
+      # 📁 yml-trigger/.github/workflows/
+      #    ├── One-Time Text & Layout Fixer.yml
+      #    └── 🎬 devloment testing.yml
+      # ────────────────────────────────────────────────────────
+      - name: 📥 Checkout yml-trigger repo (optional)
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: ${{ github.repository_owner }}/yml-trigger
+          token: ${{ secrets.GH_PAT }}
+          path: yml-trigger
+
+      # ────────────────────────────────────────────────────────
+      # STEP 3  →  Python 3.11
+      # 📄 Development/requirements.txt  (pip cache ke liye)
+      # ────────────────────────────────────────────────────────
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      # ────────────────────────────────────────────────────────
+      # STEP 4  →  ffmpeg + Hindi/Arabic fonts
+      # 🎯 Use hote hain:
+      #    Development/Assets/YatraOne.ttf       (Hindi)
+      #    Development/Assets/PlayfairDisplay.ttf (English)
+      #    Development/Assets/Amiri-Regular.ttf   (Arabic)
+      # 🎯 Render: Development/Story/Final_Render/ffmpeg_render.py
+      # ────────────────────────────────────────────────────────
+      - name: 📦 Install ffmpeg + fonts
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg fonts-noto fonts-noto-core \
+            fonts-noto-extra fonts-noto-ui-core fonts-dejavu fonts-liberation \
+            fonts-noto-color-emoji
+          fc-cache -f -v
+          ffmpeg -version | head -1
+
+      # ────────────────────────────────────────────────────────
+      # STEP 5  →  Python packages
+      # 📄 Development/requirements.txt
+      # + Pillow, numpy (composer.py imports these)
+      # ────────────────────────────────────────────────────────
+      - name: 🐍 Install requirements
+        working-directory: Development
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install requests pillow numpy
+
+      # ────────────────────────────────────────────────────────
+      # STEP 6  →  Folder structure auto-create
+      # 📁 Development/
+      #    ├── API/
+      #    │   ├── AI_Models/          (ai_fallback.py + 7 models)
+      #    │   ├── Audio_Text/         (intro_AI, outro_AI, cta_AI, elevenlabs)
+      #    │   ├── Islamic_Content/    (islamic_fallback, quran_foundation, ummah)
+      #    │   ├── Music_Sources/      (freesound, pixabay_music, music_fallback)
+      #    │   ├── Photo_Sources/      (pexels_photo, pixabay_photo, thumbnail_gen)
+      #    │   └── Video_Sources/      (pexels_video, pixabay_video, coverr, gradient)
+      #    ├── Assets/                 (fonts + sawaj_logo.png + cinematic_look.cube)
+      #    ├── Config/
+      #    │   ├── App_Configs/        (app_config.json, colors.json, palette.py)
+      #    │   ├── Language_Settings/  (hi_strings.json, hi_font_settings.json, etc.)
+      #    │   ├── Style_Settings/     (hindi_style.json, arabic_style.json, english_style.json)
+      #    │   └── Template_Settings/  (intro_1.json, outro_1.json, cta_default.json)
+      #    ├── Story/
+      #    │   ├── Audio/              (generate_voice.py, mix_audio.py, mixer.py)
+      #    │   ├── Content/            (get_hadith.py, translator.py)
+      #    │   ├── Final_Render/       (ffmpeg_render.py, render_video.py)
+      #    │   ├── Pipeline_Orchestration/ (composer.py, duration.py)
+      #    │   ├── Runtime_Logs/       (.gitkeep)
+      #    │   ├── Subtitles_Text/     (ass_builder.py, karaoke.py)
+      #    │   ├── Thumbnails/         (cta_maker.py, generate_thumb.py, thumb_maker.py)
+      #    │   ├── Upload/             (final_upload.py)
+      #    │   └── Video/              (procedural_intro.py, apply_effects.py, etc.)
+      #    ├── URL/
+      #    │   ├── Islamic/            (fawaz.py, hijri_date.py, quran.py, quran_audio.py)
+      #    │   ├── Media/              (pollinations_AI.py, url_*_fallback.py)
+      #    │   ├── TTS_Translation/    (edge_tts.py, mymemory.py, translator.py)
+      #    │   └── Text_Content/       (jokes.py, quotes.py)
+      #    ├── Uploader/               (cloudinary.py, story_upload.py, thumbnail_upload.py, webhook_uploader.py)
+      #    └── temp/                   (final output yahan banta hai)
+      # ────────────────────────────────────────────────────────
+      - name: 🗂️ Ensure folder structure
+        working-directory: Development
+        run: |
+          mkdir -p Story/Runtime_Logs temp
+          mkdir -p API/AI_Models API/Audio_Text API/Islamic_Content \
+                   API/Music_Sources API/Photo_Sources API/Video_Sources
+          mkdir -p Config/App_Configs Config/Language_Settings \
+                   Config/Style_Settings Config/Template_Settings
+          mkdir -p Story/Audio Story/Content Story/Final_Render \
+                   Story/Pipeline_Orchestration Story/Subtitles_Text \
+                   Story/Thumbnails Story/Upload Story/Video
+          mkdir -p URL/Islamic URL/Media URL/TTS_Translation URL/Text_Content
+          mkdir -p Uploader Assets
+          echo "✅ Folder structure ready"
+
+      # ────────────────────────────────────────────────────────
+      # STEP 7  →  Hindi force
+      # 📄 Development/Config/App_Configs/app_config.json
+      #    default_language: "hi" (already hai, phir bhi guarantee)
+      # ────────────────────────────────────────────────────────
+      - name: 🇮🇳 Force Hindi language config
+        working-directory: Development
+        run: |
+          python - <<'PY'
+          import json, os
+          p = "Config/App_Configs/app_config.json"
+          if os.path.exists(p):
+              cfg = json.load(open(p, encoding="utf-8"))
+              cfg["default_language"] = "hi"
+              json.dump(cfg, open(p, "w", encoding="utf-8"),
+                        ensure_ascii=False, indent=2)
+              print("✅ default_language = hi")
+          PY
+
+      # ────────────────────────────────────────────────────────
+      # STEP 8  →  🚀 RUN FULL PIPELINE
+      # 📄 ENTRY: Development/Story/Pipeline_Orchestration/composer.py
+      # 🎯 run_pipeline() andar yeh sab call karta hai:
+      #    1. URL/Islamic/fawaz.py          → hadith fetch
+      #    2. API/AI_Models/ai_fallback.py  → Hindi AI script
+      #    3. API/Audio_Text/intro_AI.py    → intro text
+      #    4. API/Audio_Text/outro_AI.py    → outro text
+      #    5. API/Audio_Text/cta_AI.py      → CTA text
+      #    6. API/Audio_Text/elevenlabs.py  → voice (fallback: URL/TTS_Translation/edge_tts.py)
+      #    7. API/Video_Sources/pexels_video.py, pixabay_video.py, coverr.py, gradient.py
+      #    8. API/Music_Sources/freesound.py, pixabay_music.py
+      #    9. Story/Thumbnails/cta_maker.py → CTA image
+      #   10. Story/Subtitles_Text/ass_builder.py → ASS subtitles
+      #   11. Story/Pipeline_Orchestration/duration.py → audio duration
+      #   12. Story/Final_Render/render_video.py → ffmpeg_render.py
+      #   13. Uploader/story_upload.py      → upload
+      # 🎬 OUTPUT: Development/temp/Final_Story.mp4
+      # ────────────────────────────────────────────────────────
+      - name: 🚀 Run full pipeline
+        working-directory: Development
+        run: |
+          export PYTHONPATH="$PWD:$PWD/Story:$PWD/API:$PWD/URL"
+          export TZ="Asia/Kolkata"
+          echo "🎬 Starting Sawaj Studio pipeline (Hindi)..."
+          python -c "from Story.Pipeline_Orchestration.composer import run_pipeline; run_pipeline()"
+
+      # ────────────────────────────────────────────────────────
+      # STEP 9  →  Artifact upload
+      # 📄 Development/temp/Final_Story.mp4
+      # 📄 Development/temp/cta_image.png
+      # 📄 Development/temp/voice.mp3
+      # ────────────────────────────────────────────────────────
+      - name: 📤 Upload final video artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Final_Story_${{ github.run_id }}
+          path: |
+            Development/temp/Final_Story.mp4
+            Development/temp/cta_image.png
+            Development/temp/voice.mp3
+          retention-days: 7
+          if-no-files-found: warn
+
+      # ────────────────────────────────────────────────────────
+      # STEP 10  →  Telegram SUCCESS
+      # 📄 Called by: Development/Story/Pipeline_Orchestration/composer.py
+      #    (send_telegram function)
+      # ────────────────────────────────────────────────────────
+      - name: ✅ Telegram success report
+        if: success()
+        run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
+            -d parse_mode="HTML" \
+            -d text="✅ <b>Sawaj Studio</b> — Hindi video ready!%0A🎬 Run #${{ github.run_number }}%0A⏰ $(date '+%d-%m-%Y %H:%M IST')"
+
+      # ────────────────────────────────────────────────────────
+      # STEP 11  →  Telegram FAILURE
+      # ────────────────────────────────────────────────────────
+      - name: ❌ Telegram failure report
+        if: failure()
+        run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
+            -d parse_mode="HTML" \
+            -d text="❌ <b>Sawaj Studio</b> — pipeline FAILED%0A🔗 ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ══════════════════════════════════════════════════════════════
+  # JOB 2: text-layout-fixer
+  # ──────────────────────────────────────────────────────────────
+  # (yml-trigger/.github/workflows/One-Time Text & Layout Fixer.yml
+  #  ka logic isme merge kiya gaya hai — alag workflow ki zaroorat nahi)
+  #
+  # 🎯 Kya karta hai:
+  #    Development/**/*.py      → trailing whitespace + CRLF fix
+  #    Development/Config/**/*.json → JSON indent normalize (Hindi-safe UTF-8)
+  # ══════════════════════════════════════════════════════════════
+  text-layout-fixer:
+    runs-on: ubuntu-latest
+    needs: build-story
+    if: always()
+    steps:
+      # ────────────────────────────────────────────────────────
+      # STEP 1  →  Checkout Development
+      # 📁 Development/
+      # ────────────────────────────────────────────────────────
+      - name: 📥 Checkout Development
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/Development
+          token: ${{ secrets.GH_PAT }}
+          path: Development
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # ────────────────────────────────────────────────────────
+      # STEP 3  →  Fix files
+      # 📄 Development/**/*.py          (700+ Python files)
+      # 📄 Development/Config/**/*.json (app_config, colors, hi_strings, hi_font_settings...)
+      # ────────────────────────────────────────────────────────
+      - name: 🧹 Fix text + layout (Hindi-safe)
+        working-directory: Development
+        run: |
+          python - <<'PY'
+          import os, re, glob
+          # Har .py file me trailing whitespace + CRLF normalize
+          fixed = 0
+          for f in glob.glob("**/*.py", recursive=True):
+              try:
+                  s = open(f, encoding="utf-8-sig").read()
+                  n = re.sub(r"[ \t]+$", "", s, flags=re.M).replace("\r\n", "\n")
+                  if n != s:
+                      open(f, "w", encoding="utf-8").write(n)
+                      fixed += 1
+              except Exception:
+                  pass
+          # JSON me indent check (Hindi-safe UTF-8)
+          import json
+          for f in glob.glob("Config/**/*.json", recursive=True):
+              try:
+                  d = json.load(open(f, encoding="utf-8-sig"))
+                  json.dump(d, open(f, "w", encoding="utf-8"),
+                            ensure_ascii=False, indent=2)
+              except Exception:
+                  pass
+          print(f"✅ Fixed {fixed} python files")
+          PY
+
+      # ────────────────────────────────────────────────────────
+      # STEP 4  →  Commit changes (agar kuch badla)
+      # 📁 Development/  →  git push origin HEAD
+      # ────────────────────────────────────────────────────────
+      - name: 💾 Commit fixes (agar kuch badla)
+        working-directory: Development
+        run: |
+          git config user.name  "sawaj-bot"
+          git config user.email "bot@sawaj.studio"
+          git add -A || true
+          git diff --quiet && echo "No changes" || \
+            git commit -m "chore: auto text/layout fix [skip ci]" && \
+            git push origin HEAD || true
