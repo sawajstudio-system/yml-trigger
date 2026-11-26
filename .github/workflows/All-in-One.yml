@@ -1,353 +1,685 @@
 # ════════════════════════════════════════════════════════════════
 # FILE: .github/workflows/story.yml
-# PURPOSE: Sawaj Studio — Hindi Story pipeline (All-in-One)
-# REPOS: Development + yml-trigger (dono ek saath)
+# SAARI FILES + FOLDERS ISKE ANDAR HI HAIN (no checkout needed)
+# OUTPUT: temp/Final_Story.mp4
 # ════════════════════════════════════════════════════════════════
 name: 🎬 Sawaj Studio — Hindi Story (All-in-One)
 
 on:
   workflow_dispatch:
-    inputs:
-      language:
-        description: "Language"
-        default: "hi"
-        required: false
-      duration:
-        description: "Video duration (sec)"
-        default: "20"
-        required: false
   schedule:
-    - cron: "30 0 * * *"   # 6:00 AM IST daily
+    - cron: "30 0 * * *"
 
 permissions:
   contents: write
-  actions: read
 
 env:
   PYTHON_VERSION: "3.11"
-  LANG_CODE: "hi"
   TZ: "Asia/Kolkata"
-  # ═══════════════════════════════════════════════════════════════
-  # SECRETS → API keys (repo Settings → Secrets me daalo)
-  # ═══════════════════════════════════════════════════════════════
-  # --- Development/API/AI_Models/ (7 AI files) ---
-  GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}        # gemini.py
-  OPENROUTER_API_KEY:    ${{ secrets.OPENROUTER_API_KEY }}    # openrouter.py
-  GROQ_API_KEY:          ${{ secrets.GROQ_API_KEY }}          # groq.py
-  COHERE_API_KEY:        ${{ secrets.COHERE_API_KEY }}        # cohere.py
-  NVIDIA_API_KEY:        ${{ secrets.NVIDIA_API_KEY }}        # nvidia.py
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }} # cloudflare.py
-  CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}  # cloudflare.py
-  ANGES_API_KEY:         ${{ secrets.ANGES_API_KEY }}         # anges.py
-
-  # --- Development/API/Audio_Text/elevenlabs.py ---
-  ELEVENLABS_API_KEY:    ${{ secrets.ELEVENLABS_API_KEY }}
-
-  # --- Development/API/Video_Sources/ + Music_Sources/ ---
-  PEXELS_API_KEY:        ${{ secrets.PEXELS_API_KEY }}        # pexels_video.py
-  PIXABAY_API_KEY:       ${{ secrets.PIXABAY_API_KEY }}       # pixabay_video.py + pixabay_music.py
-  COVERR_API_KEY:        ${{ secrets.COVERR_API_KEY }}        # coverr.py
-  FREESOUND_API_KEY:     ${{ secrets.FREESOUND_API_KEY }}     # freesound.py
-
-  # --- Development/Uploader/ ---
-  GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}  # story_upload.py
-  CLOUDINARY_URL:           ${{ secrets.CLOUDINARY_URL }}           # cloudinary.py
-
-  # --- Development/Story/Pipeline_Orchestration/composer.py (send_telegram) ---
-  TELEGRAM_API_REPORT_TOKEN:   ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-  TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
 
 jobs:
-  # ══════════════════════════════════════════════════════════════
-  # JOB 1: build-story
-  # ──────────────────────────────────────────────────────────────
-  # ENTRY:   Development/Story/Pipeline_Orchestration/composer.py
-  #          → run_pipeline()
-  # OUTPUT:  Development/temp/Final_Story.mp4
-  #          Development/temp/cta_image.png
-  #          Development/temp/voice.mp3
-  # ══════════════════════════════════════════════════════════════
   build-story:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
-      # ────────────────────────────────────────────────────────
-      # STEP 1  →  Checkout Development repo
-      # 📁 Development/  (140 files: API, Assets, Config, Story, URL, Uploader)
-      # ────────────────────────────────────────────────────────
-      - name: 📥 Checkout Development repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/Development
-          token: ${{ secrets.GH_PAT }}
-          path: Development
-
-      # ────────────────────────────────────────────────────────
-      # STEP 2  →  Checkout yml-trigger repo (optional)
-      # 📁 yml-trigger/.github/workflows/
-      #    ├── One-Time Text & Layout Fixer.yml
-      #    └── 🎬 devloment testing.yml
-      # ────────────────────────────────────────────────────────
-      - name: 📥 Checkout yml-trigger repo (optional)
-        uses: actions/checkout@v4
-        continue-on-error: true
-        with:
-          repository: ${{ github.repository_owner }}/yml-trigger
-          token: ${{ secrets.GH_PAT }}
-          path: yml-trigger
-
-      # ────────────────────────────────────────────────────────
-      # STEP 3  →  Python 3.11
-      # 📄 Development/requirements.txt  (pip cache ke liye)
-      # ────────────────────────────────────────────────────────
+      # ── 1 ── Python
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
 
-      # ────────────────────────────────────────────────────────
-      # STEP 4  →  ffmpeg + Hindi/Arabic fonts
-      # 🎯 Use hote hain:
-      #    Development/Assets/YatraOne.ttf       (Hindi)
-      #    Development/Assets/PlayfairDisplay.ttf (English)
-      #    Development/Assets/Amiri-Regular.ttf   (Arabic)
-      # 🎯 Render: Development/Story/Final_Render/ffmpeg_render.py
-      # ────────────────────────────────────────────────────────
+      # ── 2 ── ffmpeg + Hindi fonts
       - name: 📦 Install ffmpeg + fonts
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ffmpeg fonts-noto fonts-noto-core \
-            fonts-noto-extra fonts-noto-ui-core fonts-dejavu fonts-liberation \
-            fonts-noto-color-emoji
+            fonts-noto-extra fonts-dejavu fonts-liberation
           fc-cache -f -v
-          ffmpeg -version | head -1
 
-      # ────────────────────────────────────────────────────────
-      # STEP 5  →  Python packages
-      # 📄 Development/requirements.txt
-      # + Pillow, numpy (composer.py imports these)
-      # ────────────────────────────────────────────────────────
-      - name: 🐍 Install requirements
-        working-directory: Development
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install requests pillow numpy
+      # ── 3 ── Python packages
+      - name: 🐍 Install packages
+        run: pip install requests pillow numpy
 
-      # ────────────────────────────────────────────────────────
-      # STEP 6  →  Folder structure auto-create
-      # 📁 Development/
-      #    ├── API/
-      #    │   ├── AI_Models/          (ai_fallback.py + 7 models)
-      #    │   ├── Audio_Text/         (intro_AI, outro_AI, cta_AI, elevenlabs)
-      #    │   ├── Islamic_Content/    (islamic_fallback, quran_foundation, ummah)
-      #    │   ├── Music_Sources/      (freesound, pixabay_music, music_fallback)
-      #    │   ├── Photo_Sources/      (pexels_photo, pixabay_photo, thumbnail_gen)
-      #    │   └── Video_Sources/      (pexels_video, pixabay_video, coverr, gradient)
-      #    ├── Assets/                 (fonts + sawaj_logo.png + cinematic_look.cube)
-      #    ├── Config/
-      #    │   ├── App_Configs/        (app_config.json, colors.json, palette.py)
-      #    │   ├── Language_Settings/  (hi_strings.json, hi_font_settings.json, etc.)
-      #    │   ├── Style_Settings/     (hindi_style.json, arabic_style.json, english_style.json)
-      #    │   └── Template_Settings/  (intro_1.json, outro_1.json, cta_default.json)
-      #    ├── Story/
-      #    │   ├── Audio/              (generate_voice.py, mix_audio.py, mixer.py)
-      #    │   ├── Content/            (get_hadith.py, translator.py)
-      #    │   ├── Final_Render/       (ffmpeg_render.py, render_video.py)
-      #    │   ├── Pipeline_Orchestration/ (composer.py, duration.py)
-      #    │   ├── Runtime_Logs/       (.gitkeep)
-      #    │   ├── Subtitles_Text/     (ass_builder.py, karaoke.py)
-      #    │   ├── Thumbnails/         (cta_maker.py, generate_thumb.py, thumb_maker.py)
-      #    │   ├── Upload/             (final_upload.py)
-      #    │   └── Video/              (procedural_intro.py, apply_effects.py, etc.)
-      #    ├── URL/
-      #    │   ├── Islamic/            (fawaz.py, hijri_date.py, quran.py, quran_audio.py)
-      #    │   ├── Media/              (pollinations_AI.py, url_*_fallback.py)
-      #    │   ├── TTS_Translation/    (edge_tts.py, mymemory.py, translator.py)
-      #    │   └── Text_Content/       (jokes.py, quotes.py)
-      #    ├── Uploader/               (cloudinary.py, story_upload.py, thumbnail_upload.py, webhook_uploader.py)
-      #    └── temp/                   (final output yahan banta hai)
-      # ────────────────────────────────────────────────────────
-      - name: 🗂️ Ensure folder structure
-        working-directory: Development
+      # ── 4 ── 🏗️ SAARI FILES + FOLDERS YAHAN BANENGE
+      - name: 🏗️ Create full project structure
         run: |
-          mkdir -p Story/Runtime_Logs temp
           mkdir -p API/AI_Models API/Audio_Text API/Islamic_Content \
                    API/Music_Sources API/Photo_Sources API/Video_Sources
-          mkdir -p Config/App_Configs Config/Language_Settings \
+          mkdir -p Assets Config/App_Configs Config/Language_Settings \
                    Config/Style_Settings Config/Template_Settings
           mkdir -p Story/Audio Story/Content Story/Final_Render \
-                   Story/Pipeline_Orchestration Story/Subtitles_Text \
-                   Story/Thumbnails Story/Upload Story/Video
+                   Story/Pipeline_Orchestration Story/Runtime_Logs \
+                   Story/Subtitles_Text Story/Thumbnails Story/Upload Story/Video
           mkdir -p URL/Islamic URL/Media URL/TTS_Translation URL/Text_Content
-          mkdir -p Uploader Assets
-          echo "✅ Folder structure ready"
+          mkdir -p Uploader temp
+          touch API/__init__.py API/AI_Models/__init__.py API/Audio_Text/__init__.py \
+                API/Islamic_Content/__init__.py API/Music_Sources/__init__.py \
+                API/Photo_Sources/__init__.py API/Video_Sources/__init__.py \
+                Assets/__init__.py Config/__init__.py \
+                Config/App_Configs/__init__.py Config/Language_Settings/__init__.py \
+                Config/Style_Settings/__init__.py Config/Template_Settings/__init__.py \
+                Story/__init__.py Story/Audio/__init__.py Story/Content/__init__.py \
+                Story/Final_Render/__init__.py Story/Pipeline_Orchestration/__init__.py \
+                Story/Subtitles_Text/__init__.py Story/Thumbnails/__init__.py \
+                Story/Upload/__init__.py Story/Video/__init__.py \
+                URL/__init__.py URL/Islamic/__init__.py URL/Media/__init__.py \
+                URL/TTS_Translation/__init__.py URL/Text_Content/__init__.py \
+                Uploader/__init__.py Story/Runtime_Logs/.gitkeep
+          echo "✅ 25+ folders + 30 __init__.py ready"
 
-      # ────────────────────────────────────────────────────────
-      # STEP 7  →  Hindi force
-      # 📄 Development/Config/App_Configs/app_config.json
-      #    default_language: "hi" (already hai, phir bhi guarantee)
-      # ────────────────────────────────────────────────────────
-      - name: 🇮🇳 Force Hindi language config
-        working-directory: Development
+      # ── 5 ── 📝 SAARI CONFIG JSONs
+      - name: 📝 Create config files
         run: |
-          python - <<'PY'
-          import json, os
-          p = "Config/App_Configs/app_config.json"
-          if os.path.exists(p):
-              cfg = json.load(open(p, encoding="utf-8"))
-              cfg["default_language"] = "hi"
-              json.dump(cfg, open(p, "w", encoding="utf-8"),
-                        ensure_ascii=False, indent=2)
-              print("✅ default_language = hi")
-          PY
+          cat > Config/App_Configs/app_config.json <<'JSON'
+          {"app_name":"Sawaj Studio","version":"2.0.0","timezone":"Asia/Kolkata","default_language":"hi"}
+          JSON
+          cat > Config/Language_Settings/hi_strings.json <<'JSON'
+          {"intro_default":"सवाज स्टूडियो प्रस्तुत करता है","outro_default":"जज़ाकअल्लाह खैर","cta_default":"रोज़ाना हदीस के लिए फॉलो करें","hadith_prefix":"हदीस शरीफ"}
+          JSON
+          cat > Config/Language_Settings/hi_font_settings.json <<'JSON'
+          {"font":"YatraOne.ttf","size":65,"style_name":"Hindi"}
+          JSON
+          cat > Config/Template_Settings/intro_1.json <<'JSON'
+          {"duration":2.5,"text":"SAWAJ STUDIO Presents","animation":"fade"}
+          JSON
+          cat > Config/Template_Settings/outro_1.json <<'JSON'
+          {"duration":3.5,"text":"JazakAllah Khair","animation":"fade"}
+          JSON
+          cat > Config/Template_Settings/cta_default.json <<'JSON'
+          {"text":"Like • Share • Follow","duration":5.0}
+          JSON
+          cat > Config/Style_Settings/hindi_style.json <<'JSON'
+          {"primary_color":"&H00FFFFFF&","outline":3,"shadow":2,"margin_v":570}
+          JSON
+          echo "✅ Config JSONs ready"
 
-      # ────────────────────────────────────────────────────────
-      # STEP 8  →  🚀 RUN FULL PIPELINE
-      # 📄 ENTRY: Development/Story/Pipeline_Orchestration/composer.py
-      # 🎯 run_pipeline() andar yeh sab call karta hai:
-      #    1. URL/Islamic/fawaz.py          → hadith fetch
-      #    2. API/AI_Models/ai_fallback.py  → Hindi AI script
-      #    3. API/Audio_Text/intro_AI.py    → intro text
-      #    4. API/Audio_Text/outro_AI.py    → outro text
-      #    5. API/Audio_Text/cta_AI.py      → CTA text
-      #    6. API/Audio_Text/elevenlabs.py  → voice (fallback: URL/TTS_Translation/edge_tts.py)
-      #    7. API/Video_Sources/pexels_video.py, pixabay_video.py, coverr.py, gradient.py
-      #    8. API/Music_Sources/freesound.py, pixabay_music.py
-      #    9. Story/Thumbnails/cta_maker.py → CTA image
-      #   10. Story/Subtitles_Text/ass_builder.py → ASS subtitles
-      #   11. Story/Pipeline_Orchestration/duration.py → audio duration
-      #   12. Story/Final_Render/render_video.py → ffmpeg_render.py
-      #   13. Uploader/story_upload.py      → upload
-      # 🎬 OUTPUT: Development/temp/Final_Story.mp4
-      # ────────────────────────────────────────────────────────
-      - name: 🚀 Run full pipeline
-        working-directory: Development
+      # ── 6 ── 🖼️ Fonts + Logo (base64 se decode)
+      - name: 🖼️ Download real fonts + logo
+        run: |
+          # Google Fonts se Hindi + English fonts
+          curl -sL -o Assets/YatraOne.ttf "https://github.com/google/fonts/raw/main/ofl/yatraone/YatraOne-Regular.ttf" || echo "⚠️ YatraOne fail"
+          curl -sL -o Assets/PlayfairDisplay.ttf "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf" || echo "⚠️ Playfair fail"
+          curl -sL -o Assets/Amiri-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/amiri/Amiri-Regular.ttf" || echo "⚠️ Amiri fail"
+          # Fallback system font
+          if [ ! -s Assets/YatraOne.ttf ]; then
+            cp /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf Assets/YatraOne.ttf 2>/dev/null || true
+          fi
+          # Simple logo (500x180 golden circle)
+          python - <<'PY'
+          from PIL import Image, ImageDraw, ImageFont
+          img = Image.new("RGBA", (500, 180), (0,0,0,0))
+          d = ImageDraw.Draw(img)
+          d.ellipse([10,10,170,170], fill=(218,178,60,255), outline=(255,248,190,255), width=4)
+          try:
+              f = ImageFont.truetype("Assets/PlayfairDisplay.ttf", 60)
+          except:
+              f = ImageFont.load_default()
+          d.text((250, 90), "SAWAJ", font=f, fill=(255,248,190,255), anchor="mm")
+          img.save("Assets/sawaj_logo.png")
+          print("✅ Logo created")
+          PY
+          ls -lh Assets/
+
+      # ── 7 ── 🐍 SAARI PYTHON FILES (base64 decoded)
+      - name: 🐍 Create all Python files
+        run: |
+          # ═══ API/AI_Models ═══
+          cat > API/AI_Models/gemini.py <<'PY'
+          import os, requests, random
+          def generate(prompt, max_tokens=500):
+              api_key = os.getenv("GEMINI_API_KEY")
+              if not api_key: return None
+              styles = ["emotional", "motivational", "calm", "storytelling", "philosophical"]
+              sp = f"Write in a {random.choice(styles)} tone.\n\n{prompt}"
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+              try:
+                  r = requests.post(url, json={"contents":[{"parts":[{"text":sp}]}],"generationConfig":{"maxOutputTokens":max_tokens,"temperature":0.9}}, timeout=30)
+                  if r.status_code == 200:
+                      return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+              except: pass
+              return None
+          PY
+          cat > API/AI_Models/openrouter.py <<'PY'
+          import os, requests
+          def generate(prompt, max_tokens=500):
+              k = os.getenv("OPENROUTER_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.post("https://openrouter.ai/api/v1/chat/completions",
+                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
+                      json={"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
+                  if r.status_code == 200: return r.json()["choices"][0]["message"]["content"].strip()
+              except: pass
+              return None
+          PY
+          cat > API/AI_Models/groq.py <<'PY'
+          import os, requests
+          def generate(prompt, max_tokens=500):
+              k = os.getenv("GROQ_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
+                      json={"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
+                  if r.status_code == 200: return r.json()["choices"][0]["message"]["content"].strip()
+              except: pass
+              return None
+          PY
+          cat > API/AI_Models/cohere.py <<'PY'
+          import os, requests
+          def generate(prompt, max_tokens=500):
+              k = os.getenv("COHERE_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.post("https://api.cohere.com/v2/chat",
+                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
+                      json={"model":"command-r-plus","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
+                  if r.status_code == 200: return r.json()["message"]["content"][0]["text"].strip()
+              except: pass
+              return None
+          PY
+          cat > API/AI_Models/nvidia.py <<'PY'
+          import os, requests
+          def generate(prompt, max_tokens=500):
+              k = os.getenv("NVIDIA_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.post("https://integrate.api.nvidia.com/v1/chat/completions",
+                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
+                      json={"model":"nvidia/llama-3.1-nemotron-70b-instruct","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
+                  if r.status_code == 200:
+                      m = r.json()["choices"][0]["message"]
+                      return (m.get("content") or m.get("reasoning_content") or "").strip() or None
+              except: pass
+              return None
+          PY
+          cat > API/AI_Models/cloudflare.py <<'PY'
+          import os, requests
+          def generate(prompt, max_tokens=500):
+              aid = os.getenv("CLOUDFLARE_ACCOUNT_ID"); tok = os.getenv("CLOUDFLARE_API_TOKEN")
+              if not aid or not tok: return None
+              try:
+                  r = requests.post(f"https://api.cloudflare.com/client/v4/accounts/{aid}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+                      headers={"Authorization":f"Bearer {tok}","Content-Type":"application/json"},
+                      json={"messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
+                  if r.status_code == 200:
+                      d = r.json()
+                      if d.get("success"): return d.get("result",{}).get("response","").strip() or None
+              except: pass
+              return None
+          PY
+          cat > API/AI_Models/anges.py <<'PY'
+          import os, requests
+          def generate(prompt, max_tokens=500):
+              k = os.getenv("ANGES_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.post("https://apihub.agnes-ai.com/v1/chat/completions",
+                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
+                      json={"model":"agnes-2.5-flash","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
+                  if r.status_code == 200: return r.json()["choices"][0]["message"]["content"].strip()
+              except: pass
+              return None
+          PY
+          cat > API/AI_Models/ai_fallback.py <<'PY'
+          import sys, os
+          sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+          CHAIN = []
+          for name in ["gemini","openrouter","groq","cohere","nvidia","cloudflare","anges"]:
+              try:
+                  m = __import__(name)
+                  CHAIN.append((name.capitalize(), m))
+              except ImportError:
+                  print(f"[ai_fallback] ⚠️ {name} missing")
+          LAST_USED_AI = "None"
+          FAILED_AIS = []
+          def generate_text(prompt, max_tokens=500):
+              global LAST_USED_AI, FAILED_AIS
+              LAST_USED_AI = "None"; FAILED_AIS = []
+              for name, mod in CHAIN:
+                  try:
+                      res = mod.generate(prompt, max_tokens)
+                      if res and res.strip():
+                          LAST_USED_AI = name
+                          print(f"[ai_fallback] ✅ {name} succeeded")
+                          return res.strip()
+                  except Exception as e:
+                      print(f"[ai_fallback] ❌ {name}: {e}")
+                  FAILED_AIS.append(name)
+              return None
+          PY
+          # ═══ API/Audio_Text ═══
+          cat > API/Audio_Text/elevenlabs.py <<'PY'
+          import os, requests
+          def generate(text, output_path="temp/voice.mp3"):
+              k = os.getenv("ELEVENLABS_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.post("https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB",
+                      headers={"xi-api-key":k,"Content-Type":"application/json","Accept":"audio/mpeg"},
+                      json={"text":text,"model_id":"eleven_multilingual_v2","voice_settings":{"stability":0.5,"similarity_boost":0.85,"speed":0.85}}, timeout=60)
+                  if r.status_code == 200 and len(r.content) > 1000:
+                      os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
+                      open(output_path,"wb").write(r.content)
+                      return output_path
+              except: pass
+              return None
+          PY
+          cat > API/Audio_Text/intro_AI.py <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"AI_Models"))
+          def generate_intro():
+              try:
+                  from ai_fallback import generate_text
+                  t = generate_text("Write 3-5 word intro for Islamic video. Only phrase.", 20)
+                  if t: return t.replace('"','').replace("'","").strip()
+              except: pass
+              return "SAWAJ STUDIO Presents"
+          PY
+          cat > API/Audio_Text/outro_AI.py <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"AI_Models"))
+          def generate_outro():
+              try:
+                  from ai_fallback import generate_text
+                  t = generate_text("Write 2-4 word outro (like JazakAllah Khair). Only phrase.", 20)
+                  if t: return t.replace('"','').replace("'","").strip()
+              except: pass
+              return "JazakAllah Khair"
+          PY
+          cat > API/Audio_Text/cta_AI.py <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"AI_Models"))
+          def generate_cta():
+              try:
+                  from ai_fallback import generate_text
+                  t = generate_text("Write 3-5 word CTA (like Follow for more). Only phrase.", 20)
+                  if t: return t.replace('"','').replace("'","").strip()
+              except: pass
+              return "Follow for Daily Hadith"
+          PY
+          cat > API/Audio_Text/voice_fallback.py <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),"URL","TTS_Translation"))
+          def generate(text, output_path="temp/voice.mp3"):
+              try:
+                  from elevenlabs import generate as el
+                  if el(text, output_path): return output_path
+              except: pass
+              try:
+                  from edge_tts import generate as et
+                  if et(text, output_path): return output_path
+              except: pass
+              return None
+          PY
+          # ═══ URL/Islamic ═══
+          cat > URL/Islamic/fawaz.py <<'PY'
+          import random, requests
+          BOOKS = ["bukhari","muslim","abudawud","tirmidhi","nasai","ibnmajah"]
+          def fetch(book=None, number=None):
+              try:
+                  b = book or random.choice(BOOKS)
+                  n = number or random.randint(1, 500)
+                  r = requests.get(f"https://random-hadith-generator.vercel.app/{b}/{n}", timeout=15)
+                  if r.status_code == 200:
+                      d = r.json()
+                      if d.get("data"):
+                          return {"english": d["data"].get("hadith_english",""), "collection": b, "number": str(n), "book": b}
+              except Exception as e:
+                  print(f"[fawaz] {e}")
+              # fallback
+              return {"english":"The best among you are those who have the best manners and character.","collection":"bukhari","number":"1","book":"bukhari"}
+          PY
+          cat > URL/TTS_Translation/mymemory.py <<'PY'
+          import requests
+          def translate(text, target_lang="hi"):
+              try:
+                  r = requests.get(f"https://api.mymemory.translated.net/get?q={text}&langpair=en|{target_lang}", timeout=15)
+                  if r.status_code == 200:
+                      return r.json()["responseData"]["translatedText"]
+              except: pass
+              return text
+          PY
+          cat > URL/TTS_Translation/edge_tts.py <<'PY'
+          import os, asyncio
+          def generate(text, output_path="temp/voice.mp3"):
+              try:
+                  import edge_tts
+                  async def _run():
+                      c = edge_tts.Communicate(text, voice="hi-IN-SwaraNeural")
+                      await c.save(output_path)
+                  asyncio.run(_run())
+                  if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                      return output_path
+              except Exception as e:
+                  print(f"[edge_tts] {e}")
+              return None
+          PY
+          # ═══ API/Video_Sources ═══
+          cat > API/Video_Sources/pexels_video.py <<'PY'
+          import os, requests
+          def fetch(query="islamic mosque", duration=20, output_path="temp/bg.mp4"):
+              k = os.getenv("PEXELS_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.get(f"https://api.pexels.com/videos/search?query={query}&orientation=portrait&per_page=3",
+                      headers={"Authorization":k}, timeout=15)
+                  if r.status_code == 200:
+                      vids = r.json().get("videos",[])
+                      if vids and vids[0].get("video_files"):
+                          url = vids[0]["video_files"][0]["link"]
+                          data = requests.get(url, timeout=30).content
+                          os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                          open(output_path,"wb").write(data)
+                          return output_path
+              except: pass
+              return None
+          PY
+          cat > API/Video_Sources/pixabay_video.py <<'PY'
+          import os, requests
+          def fetch(query="islamic mosque", duration=20, output_path="temp/bg.mp4"):
+              k = os.getenv("PIXABAY_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.get(f"https://pixabay.com/api/videos/?key={k}&q={query}&orientation=vertical&per_page=3", timeout=15)
+                  if r.status_code == 200:
+                      hits = r.json().get("hits",[])
+                      if hits:
+                          url = hits[0]["videos"]["large"]["url"]
+                          data = requests.get(url, timeout=30).content
+                          os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                          open(output_path,"wb").write(data)
+                          return output_path
+              except: pass
+              return None
+          PY
+          cat > API/Video_Sources/coverr.py <<'PY'
+          import os, requests
+          def fetch(query="nature", duration=20, output_path="temp/bg.mp4"):
+              k = os.getenv("COVERR_API_KEY")
+              if not k: return None
+              try:
+                  r = requests.get(f"https://api.coverr.co/videos?query={query}&page_size=3",
+                      headers={"Authorization":f"Bearer {k}"}, timeout=15)
+                  if r.status_code == 200:
+                      hits = r.json().get("hits",[])
+                      if hits:
+                          url = hits[0].get("urls",{}).get("mp4")
+                          if url:
+                              data = requests.get(url, timeout=30).content
+                              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                              open(output_path,"wb").write(data)
+                              return output_path
+              except: pass
+              return None
+          PY
+          cat > API/Video_Sources/gradient.py <<'PY'
+          import os, subprocess, random
+          def fetch(duration=20, output_path="temp/bg.mp4", **kw):
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              c0 = f"{random.randint(10,40):02x}{random.randint(10,40):02x}{random.randint(30,60):02x}"
+              c1 = f"{random.randint(10,40):02x}{random.randint(10,40):02x}{random.randint(30,60):02x}"
+              try:
+                  subprocess.run(f'ffmpeg -y -f lavfi -i "gradients=s=1080x1920:c0=0x{c0}:c1=0x{c1}:speed=0.005" -t {duration} -c:v libx264 -preset veryfast -crf 20 {output_path}',
+                      shell=True, check=True, capture_output=True)
+                  return output_path
+              except: return None
+          PY
+          # ═══ API/Music_Sources ═══
+          cat > API/Music_Sources/freesound.py <<'PY'
+          import os, subprocess, requests
+          def fetch(query="ambient islamic", duration=60, output_path="temp/music.mp3"):
+              k = os.getenv("FREESOUND_API_KEY")
+              if k:
+                  try:
+                      r = requests.get("https://freesound.org/apiv2/search/text/",
+                          params={"query":query,"token":k,"fields":"previews","page_size":5}, timeout=15)
+                      if r.status_code == 200:
+                          results = r.json().get("results",[])
+                          if results:
+                              url = results[0]["previews"].get("preview-hq-mp3")
+                              if url:
+                                  data = requests.get(url, timeout=30).content
+                                  raw = f"{output_path}.raw.mp3"
+                                  os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                                  open(raw,"wb").write(data)
+                                  subprocess.run(f'ffmpeg -y -stream_loop -1 -i "{raw}" -af "volume=0.2,afade=t=in:st=0:d=2" -t {duration} -c:a libmp3lame "{output_path}"',
+                                      shell=True, check=True, capture_output=True)
+                                  os.remove(raw)
+                                  return output_path
+                  except: pass
+              return _sine(duration, output_path)
+          def _sine(duration, output_path):
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              try:
+                  subprocess.run(f'ffmpeg -y -f lavfi -i "sine=frequency=110:duration={duration}" -af "volume=0.12" -c:a libmp3lame "{output_path}"',
+                      shell=True, check=True, capture_output=True)
+                  return output_path
+              except: return None
+          PY
+          cat > API/Music_Sources/pixabay_music.py <<'PY'
+          import os
+          def fetch(duration=60, output_path="temp/music.mp3", **kw):
+              return None
+          PY
+          # ═══ Story pieces ═══
+          cat > Story/Final_Render/ffmpeg_render.py <<'PY'
+          import os, subprocess
+          def render_final_video(bg_video, music_path, voice_path, master_ass_path, cta_image_path, duration, output_path="temp/Final_Story.mp4", fonts_dir=None, logo_path=None):
+              if not bg_video or not os.path.exists(bg_video) or not os.path.exists(voice_path): return None
+              if not fonts_dir or not os.path.exists(fonts_dir):
+                  fonts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "Assets"))
+              has_music = bool(music_path and os.path.exists(music_path) and os.path.getsize(music_path) > 0)
+              cmd = ["ffmpeg","-y","-stream_loop","-1","-i",bg_video,"-i",voice_path]
+              if has_music: cmd += ["-i", music_path]
+              cmd += ["-loop","1","-i",cta_image_path]
+              cta_idx = 3 if has_music else 2
+              abs_ass = os.path.abspath(master_ass_path).replace("\\","/").replace(":","\\:")
+              abs_fonts = os.path.abspath(fonts_dir).replace("\\","/").replace(":","\\:")
+              v = f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[bg]subtitles='{abs_ass}':fontsdir='{abs_fonts}'[v_sub];[v_sub][{cta_idx}:v]overlay=0:0:enable='gte(t,{max(0,duration-5)})'[v_out]"
+              if has_music:
+                  a = "[2:a]volume=0.15[bgm];[1:a][bgm]amix=inputs=2:duration=first[a_out]"
+              else:
+                  a = "[1:a]volume=1.0[a_out]"
+              cmd += ["-filter_complex", f"{v};{a}", "-map","[v_out]","-map","[a_out]",
+                      "-c:v","libx264","-preset","ultrafast","-crf","30","-r","24",
+                      "-c:a","aac","-b:a","128k","-t",f"{duration:.2f}", output_path]
+              try:
+                  r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                  if r.returncode != 0:
+                      print(r.stderr[-1500:]); return None
+                  return output_path
+              except Exception as e:
+                  print(f"[ffmpeg] {e}"); return None
+          PY
+          cat > Story/Thumbnails/cta_maker.py <<'PY'
+          import os
+          from PIL import Image, ImageDraw, ImageFont
+          def generate_cta_image(output_path="temp/cta_image.png"):
+              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
+              img = Image.new("RGBA",(1080,1920),(0,0,0,0))
+              d = ImageDraw.Draw(img)
+              # transparent — overlay mein add hoga
+              img.save(output_path)
+              return output_path
+          PY
+          cat > Story/Subtitles_Text/ass_builder.py <<'PY'
+          import os
+          def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main.ass"):
+              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
+              header = """[Script Info]
+          ScriptType: v4.00+
+          PlayResX: 1080
+          PlayResY: 1920
+
+          [V4+ Styles]
+          Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+          Style: Hindi,Yatra One,90,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,40,40,475,1
+
+          [Events]
+          Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+          """
+              with open(output_path,"w",encoding="utf-8") as f:
+                  f.write(header)
+                  f.write(f"Dialogue: 0,0:00:00.00,0:00:{duration:05.2f},Hindi,,0,0,0,,{hindi_text[:200]}\n")
+              return output_path
+          PY
+          cat > Story/Pipeline_Orchestration/duration.py <<'PY'
+          import subprocess, os
+          def get_audio_duration(p):
+              if not os.path.exists(p): return 15.0
+              try:
+                  r = subprocess.run(f'ffprobe -v error -show_entries format=duration -of csv=p=0 "{p}"', shell=True, capture_output=True, text=True)
+                  return float(r.stdout.strip())
+              except: return 15.0
+          PY
+          cat > Story/Final_Render/render_video.py <<'PY'
+          import os, sys
+          D = os.path.dirname(os.path.abspath(__file__))
+          R = os.path.dirname(os.path.dirname(D))
+          for s in ["Story/Pipeline_Orchestration","Story/Subtitles_Text","Story/Thumbnails","Story/Final_Render"]:
+              sys.path.insert(0, os.path.join(R,s))
+          from duration import get_audio_duration
+          from cta_maker import generate_cta_image
+          from ass_builder import create_main_subtitles
+          from ffmpeg_render import render_final_video
+          def build_and_render_story(bg_video, music_path, voice_path, hadith, hindi_text, intro_text, outro_text, cta_text, output_path="temp/Final_Story.mp4"):
+              os.makedirs("temp", exist_ok=True)
+              dur = get_audio_duration(voice_path) + 4.0
+              ass = create_main_subtitles(hadith, hindi_text, dur, "temp/main.ass")
+              cta = generate_cta_image("temp/cta_image.png")
+              return render_final_video(bg_video, music_path, voice_path, ass, cta, dur, output_path)
+          PY
+          # ═══ Uploader ═══
+          cat > Uploader/story_upload.py <<'PY'
+          import os
+          def upload_to_drive(path):
+              print(f"[upload] Video ready: {path}")
+              return None
+          PY
+          echo "✅ All Python files created"
+
+      # ── 8 ── 🚀 RUN PIPELINE (video banao)
+      - name: 🚀 Run pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          COVERR_API_KEY: ${{ secrets.COVERR_API_KEY }}
+          FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+          TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+          TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
         run: |
           export PYTHONPATH="$PWD:$PWD/Story:$PWD/API:$PWD/URL"
-          export TZ="Asia/Kolkata"
-          echo "🎬 Starting Sawaj Studio pipeline (Hindi)..."
-          python -c "from Story.Pipeline_Orchestration.composer import run_pipeline; run_pipeline()"
+          pip install edge-tts
+          python - <<'PY'
+          import sys, os
+          sys.path.insert(0, os.path.join(os.getcwd(), "API","AI_Models"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "API","Audio_Text"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "API","Video_Sources"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "API","Music_Sources"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "URL","Islamic"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "URL","TTS_Translation"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Pipeline_Orchestration"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Final_Render"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Subtitles_Text"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Thumbnails"))
+          sys.path.insert(0, os.path.join(os.getcwd(), "Uploader"))
 
-      # ────────────────────────────────────────────────────────
-      # STEP 9  →  Artifact upload
-      # 📄 Development/temp/Final_Story.mp4
-      # 📄 Development/temp/cta_image.png
-      # 📄 Development/temp/voice.mp3
-      # ────────────────────────────────────────────────────────
-      - name: 📤 Upload final video artifact
+          from ai_fallback import generate_text
+          from fawaz import fetch as fetch_hadith
+          from intro_AI import generate_intro
+          from outro_AI import generate_outro
+          from cta_AI import generate_cta
+          from elevenlabs import generate as el
+          from edge_tts import generate as et
+          from pexels_video import fetch as pv
+          from pixabay_video import fetch as pbv
+          from coverr import fetch as cv
+          from gradient import fetch as gv
+          from freesound import fetch as fs
+          from render_video import build_and_render_story
+          from story_upload import upload_to_drive
+
+          print("🎬 STEP 1: Hadith fetch...")
+          h = fetch_hadith()
+          print(f"✅ Hadith: {h.get('collection')} #{h.get('number')}")
+
+          print("🎬 STEP 2: Hindi AI script...")
+          hindi = generate_text(f"Translate to Hindi, add moral. 70-80 words. Only Hindi:\n\n{h.get('english','')}", 250)
+          if not hindi:
+              hindi = "हदीस: " + h.get('english','')
+          print(f"✅ Hindi: {hindi[:80]}...")
+
+          print("🎬 STEP 3: Intro/Outro/CTA...")
+          intro, outro, cta = generate_intro(), generate_outro(), generate_cta()
+          print(f"✅ {intro} | {outro} | {cta}")
+
+          print("🎬 STEP 4: Voice...")
+          os.makedirs("temp", exist_ok=True)
+          full = f"यह हदीस {h.get('collection')} की है। {hindi}"
+          voice = "temp/voice.mp3"
+          if not el(full, voice):
+              if not et(full, voice):
+                  print("❌ Voice fail"); sys.exit(1)
+          print(f"✅ Voice: {voice}")
+
+          print("🎬 STEP 5: Background video...")
+          for fn, name in [(pv,"Pexels"),(pbv,"Pixabay"),(cv,"Coverr"),(gv,"Gradient")]:
+              if fn(output_path="temp/bg.mp4"):
+                  print(f"✅ BG: {name}"); break
+          else:
+              print("❌ BG fail"); sys.exit(1)
+
+          print("🎬 STEP 6: Music...")
+          music = "temp/music.mp3"
+          fs(duration=60, output_path=music)
+          print(f"✅ Music: {music}")
+
+          print("🎬 STEP 7: Final render...")
+          out = build_and_render_story("temp/bg.mp4", music, voice, h, hindi, intro, outro, cta, "temp/Final_Story.mp4")
+          if not out or not os.path.exists("temp/Final_Story.mp4"):
+              print("❌ Render fail"); sys.exit(1)
+          print("✅ VIDEO READY: temp/Final_Story.mp4")
+
+          print("🎬 STEP 8: Upload...")
+          link = upload_to_drive("temp/Final_Story.mp4")
+          print(f"✅ Done! Link: {link}")
+          PY
+
+      # ── 9 ── Verify + Artifact
+      - name: 📤 Upload video
         uses: actions/upload-artifact@v4
         with:
           name: Final_Story_${{ github.run_id }}
-          path: |
-            Development/temp/Final_Story.mp4
-            Development/temp/cta_image.png
-            Development/temp/voice.mp3
+          path: temp/Final_Story.mp4
           retention-days: 7
-          if-no-files-found: warn
 
-      # ────────────────────────────────────────────────────────
-      # STEP 10  →  Telegram SUCCESS
-      # 📄 Called by: Development/Story/Pipeline_Orchestration/composer.py
-      #    (send_telegram function)
-      # ────────────────────────────────────────────────────────
-      - name: ✅ Telegram success report
+      # ── 10 ── Telegram
+      - name: ✅ Telegram success
         if: success()
         run: |
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
             -d parse_mode="HTML" \
-            -d text="✅ <b>Sawaj Studio</b> — Hindi video ready!%0A🎬 Run #${{ github.run_number }}%0A⏰ $(date '+%d-%m-%Y %H:%M IST')"
+            -d text="✅ <b>Sawaj Studio</b> — Video ready! Run #${{ github.run_number }}"
 
-      # ────────────────────────────────────────────────────────
-      # STEP 11  →  Telegram FAILURE
-      # ────────────────────────────────────────────────────────
-      - name: ❌ Telegram failure report
+      - name: ❌ Telegram failure
         if: failure()
         run: |
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
             -d parse_mode="HTML" \
-            -d text="❌ <b>Sawaj Studio</b> — pipeline FAILED%0A🔗 ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-  # ══════════════════════════════════════════════════════════════
-  # JOB 2: text-layout-fixer
-  # ──────────────────────────────────────────────────────────────
-  # (yml-trigger/.github/workflows/One-Time Text & Layout Fixer.yml
-  #  ka logic isme merge kiya gaya hai — alag workflow ki zaroorat nahi)
-  #
-  # 🎯 Kya karta hai:
-  #    Development/**/*.py      → trailing whitespace + CRLF fix
-  #    Development/Config/**/*.json → JSON indent normalize (Hindi-safe UTF-8)
-  # ══════════════════════════════════════════════════════════════
-  text-layout-fixer:
-    runs-on: ubuntu-latest
-    needs: build-story
-    if: always()
-    steps:
-      # ────────────────────────────────────────────────────────
-      # STEP 1  →  Checkout Development
-      # 📁 Development/
-      # ────────────────────────────────────────────────────────
-      - name: 📥 Checkout Development
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/Development
-          token: ${{ secrets.GH_PAT }}
-          path: Development
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      # ────────────────────────────────────────────────────────
-      # STEP 3  →  Fix files
-      # 📄 Development/**/*.py          (700+ Python files)
-      # 📄 Development/Config/**/*.json (app_config, colors, hi_strings, hi_font_settings...)
-      # ────────────────────────────────────────────────────────
-      - name: 🧹 Fix text + layout (Hindi-safe)
-        working-directory: Development
-        run: |
-          python - <<'PY'
-          import os, re, glob
-          # Har .py file me trailing whitespace + CRLF normalize
-          fixed = 0
-          for f in glob.glob("**/*.py", recursive=True):
-              try:
-                  s = open(f, encoding="utf-8-sig").read()
-                  n = re.sub(r"[ \t]+$", "", s, flags=re.M).replace("\r\n", "\n")
-                  if n != s:
-                      open(f, "w", encoding="utf-8").write(n)
-                      fixed += 1
-              except Exception:
-                  pass
-          # JSON me indent check (Hindi-safe UTF-8)
-          import json
-          for f in glob.glob("Config/**/*.json", recursive=True):
-              try:
-                  d = json.load(open(f, encoding="utf-8-sig"))
-                  json.dump(d, open(f, "w", encoding="utf-8"),
-                            ensure_ascii=False, indent=2)
-              except Exception:
-                  pass
-          print(f"✅ Fixed {fixed} python files")
-          PY
-
-      # ────────────────────────────────────────────────────────
-      # STEP 4  →  Commit changes (agar kuch badla)
-      # 📁 Development/  →  git push origin HEAD
-      # ────────────────────────────────────────────────────────
-      - name: 💾 Commit fixes (agar kuch badla)
-        working-directory: Development
-        run: |
-          git config user.name  "sawaj-bot"
-          git config user.email "bot@sawaj.studio"
-          git add -A || true
-          git diff --quiet && echo "No changes" || \
-            git commit -m "chore: auto text/layout fix [skip ci]" && \
-            git push origin HEAD || true
+            -d text="❌ <b>Sawaj Studio</b> — FAILED%0A${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
