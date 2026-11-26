@@ -56,14 +56,22 @@ jobs:
           ass_src = '''import os
           import re
 
-          # Bright glowing ASS colors (&HAABBGGRR&)
-          PALETTE = [
-              "&H001E90FF&",  # Bright Orange / Amber
-              "&H00FFFF33&",  # Bright Cyan / Aqua
-              "&H0033FF99&",  # Bright Mint / Neon Green
-              "&H00FF66FF&",  # Bright Magenta / Pink
-              "&H0033CCFF&",  # Bright Gold / Yellow-Orange
-              "&H00FFAA44&",  # Bright Sky Blue
+          # Bright ASS colors (&H00BBGGRR&) matching 11512.jpg style
+          DOT_PALETTE = [
+              "&H003898FF&",  # Warm Orange
+              "&H00FFCC44&",  # Sky / Cyan Blue
+              "&H0018B8FF&",  # Golden Amber
+              "&H0078FF88&",  # Mint Green
+              "&H00FF78E8&",  # Soft Magenta
+          ]
+
+          WORD_PALETTE = [
+              "&H00FFCC44&",  # Sky Blue
+              "&H0088FF99&",  # Soft Green
+              "&H0022E8FF&",  # Bright Yellow
+              "&H00FF78E8&",  # Pink / Magenta
+              "&H0055AAFF&",  # Bright Orange
+              "&H00FFFF66&",  # Aqua Cyan
           ]
 
           def _fmt_ts(sec):
@@ -93,6 +101,16 @@ jobs:
                   i += step
               return chunks
 
+          def _colorize_words(chunk_text, step_idx, lang_offset=0):
+              words = [w for w in str(chunk_text or "").split() if w]
+              if not words:
+                  return ""
+              parts = []
+              for w_idx, word in enumerate(words):
+                  col = WORD_PALETTE[(step_idx * 2 + lang_offset + w_idx) % len(WORD_PALETTE)]
+                  parts.append(f"{{\\1c{col}}}{word}")
+              return " ".join(parts)
+
           def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_subtitles.ass"):
               hadith_dict = hadith if isinstance(hadith, dict) else {}
               ara_src = re.sub(r'[\\"\\n\\r]', " ", str(hadith_dict.get("arabic", ""))).strip()
@@ -104,10 +122,7 @@ jobs:
               eng_parts = _split_2_to_3_words(eng_src)
               steps = max(len(ara_parts), len(hin_parts), len(eng_parts), 1)
 
-              # Alignment=2 (bottom-center) with clean stacked MarginV from bottom (1920):
-              # Block 1 (Arabic): MarginV 980 (bar at 930)
-              # Block 2 (Hindi):  MarginV 730 (bar at 680)
-              # Block 3 (English):MarginV 480 (bar at 430)
+              # Alignment=5 (middle-center) with clean 3-row layout like 11512.jpg
               header = [
                   "[Script Info]",
                   "ScriptType: v4.00+",
@@ -117,15 +132,12 @@ jobs:
                   "",
                   "[V4+ Styles]",
                   "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-                  "Style: DotAra,Arial,68,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,3,2,80,80,982,1",
-                  "Style: AraText,Amiri,74,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,3,2,150,80,980,1",
-                  "Style: BarAra,Arial,34,&H00FFFFFF&,&H000000FF&,&H00000000&,&H66000000,-1,0,0,0,125,65,-2,0,1,2,2,2,150,80,928,1",
-                  "Style: DotHin,Arial,68,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,3,2,80,80,732,1",
-                  "Style: HinText,Yatra One,66,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,3,2,150,80,730,1",
-                  "Style: BarHin,Arial,34,&H00FFFFFF&,&H000000FF&,&H00000000&,&H66000000,-1,0,0,0,125,65,-2,0,1,2,2,2,150,80,678,1",
-                  "Style: DotEng,Arial,68,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,3,2,80,80,482,1",
-                  "Style: EngText,Playfair Display,62,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,3,2,150,80,480,1",
-                  "Style: BarEng,Arial,34,&H00FFFFFF&,&H000000FF&,&H00000000&,&H66000000,-1,0,0,0,125,65,-2,0,1,2,2,2,150,80,428,1",
+                  "Style: DotAra,Arial,62,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1",
+                  "Style: AraText,Amiri,66,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,120,60,0,1",
+                  "Style: DotHin,Arial,62,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1",
+                  "Style: HinText,Yatra One,58,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,120,60,0,1",
+                  "Style: DotEng,Arial,62,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1",
+                  "Style: EngText,Playfair Display,54,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,120,60,0,1",
                   "",
                   "[Events]",
                   "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -134,7 +146,6 @@ jobs:
               t_start = 4.0
               t_end = max(float(duration or 20.0) - 4.2, t_start + 3.0)
               step_dur = (t_end - t_start) / steps
-              bar_str = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
 
               lines = []
               for i in range(steps):
@@ -144,22 +155,19 @@ jobs:
                   h_val = hin_parts[i % len(hin_parts)] if hin_parts else ""
                   e_val = eng_parts[i % len(eng_parts)] if eng_parts else ""
 
-                  c_a = PALETTE[i % len(PALETTE)]
-                  c_h = PALETTE[(i + 1) % len(PALETTE)]
-                  c_e = PALETTE[(i + 2) % len(PALETTE)]
+                  dot_a = DOT_PALETTE[i % len(DOT_PALETTE)]
+                  dot_h = DOT_PALETTE[(i + 1) % len(DOT_PALETTE)]
+                  dot_e = DOT_PALETTE[(i + 2) % len(DOT_PALETTE)]
 
                   if a_val:
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotAra,,,0,0,,{{\\1c{c_a}\\3c&H000000&\\blur2}}●")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},AraText,,,0,0,,{{\\1c{c_a}\\3c&H000000&\\blur1}}{a_val}")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},BarAra,,,0,0,,{{\\1c{c_a}\\3c&H000000&\\blur2}}{bar_str}")
+                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotAra,,,0,0,,{{\\pos(105,830)\\1c{dot_a}\\3c&H000000&\\blur1}}●")
+                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},AraText,,,0,0,,{{\\pos(390,830)\\3c&H000000&\\blur1}}{_colorize_words(a_val, i, 0)}")
                   if h_val:
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotHin,,,0,0,,{{\\1c{c_h}\\3c&H000000&\\blur2}}●")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},HinText,,,0,0,,{{\\1c{c_h}\\3c&H000000&\\blur1}}{h_val}")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},BarHin,,,0,0,,{{\\1c{c_h}\\3c&H000000&\\blur2}}{bar_str}")
+                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotHin,,,0,0,,{{\\pos(105,1030)\\1c{dot_h}\\3c&H000000&\\blur1}}●")
+                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},HinText,,,0,0,,{{\\pos(430,1030)\\3c&H000000&\\blur1}}{_colorize_words(h_val, i, 2)}")
                   if e_val:
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotEng,,,0,0,,{{\\1c{c_e}\\3c&H000000&\\blur2}}●")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},EngText,,,0,0,,{{\\1c{c_e}\\3c&H000000&\\blur1}}{e_val}")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},BarEng,,,0,0,,{{\\1c{c_e}\\3c&H000000&\\blur2}}{bar_str}")
+                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotEng,,,0,0,,{{\\pos(105,1230)\\1c{dot_e}\\3c&H000000&\\blur1}}●")
+                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},EngText,,,0,0,,{{\\pos(460,1230)\\3c&H000000&\\blur1}}{_colorize_words(e_val, i, 4)}")
 
               out_dir = os.path.dirname(output_path) or "temp"
               os.makedirs(out_dir, exist_ok=True)
@@ -225,7 +233,7 @@ jobs:
                   cmd += ["-loop", "1", "-i", cta_image_path]
 
               cta_idx = 3 if has_music else 2
-              v = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=brightness=0.02:contrast=1.12:saturation=1.15[bg];"
+              v = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=brightness=0.01:contrast=1.10:saturation=1.12[bg];"
 
               abs_ass_esc = _esc_ffmpeg_path(os.path.abspath(master_ass_path))
               abs_fonts_esc = _esc_ffmpeg_path(abs_fonts) if abs_fonts else ""
@@ -324,7 +332,7 @@ jobs:
               "temp/verify_subs.ass",
           )
           assert out and len(open(out, encoding="utf-8").read()) > 150
-          print("✅ Bright 2-3 word subtitle check passed:", out)
+          print("✅ 11512-style 2-3 word multi-color subtitle check passed:", out)
           EOF
           rm -rf temp
 
@@ -339,7 +347,7 @@ jobs:
           fi
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "fix: bright glowing 3-language 2-3 word subtitles with dot and bar"
+            git commit -m "fix: match 11512 style 3-language 2-3 word subtitles with dot and per-word colors"
             git push origin HEAD:main
             echo "✅ Successfully pushed upgrade to Development/main"
           else
