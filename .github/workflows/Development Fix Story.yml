@@ -17,8 +17,7 @@ jobs:
       - name: 🧩 Create Sources/fawaz.py & Update Old Paths Safely
         run: |
           python3 - <<'PYEOF'
-          import os
-          import re
+          import base64
           from pathlib import Path
 
           ROOT = Path(".").resolve()
@@ -27,113 +26,60 @@ jobs:
 
           fawaz_file = sources_dir / "fawaz.py"
           if not fawaz_file.exists():
-              fawaz_code = '''import random
-import requests
-
-BOOKS = [
-    ("bukhari", "Sahih al-Bukhari"),
-    ("muslim", "Sahih Muslim"),
-    ("abudawud", "Sunan Abi Dawud"),
-    ("tirmidhi", "Jami at-Tirmidhi"),
-    ("nasai", "Sunan an-Nasa'i"),
-    ("ibnmajah", "Sunan Ibn Majah"),
-]
-
-FALLBACK_HADITHS = [
-    {
-        "collection": "Sahih al-Bukhari",
-        "number": "1",
-        "arabic": "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",
-        "english": "The reward of deeds depends upon the intentions and every person will get the reward according to what he has intended.",
-        "narrator": "Umar bin Al-Khattab",
-    },
-    {
-        "collection": "Sahih Muslim",
-        "number": "223",
-        "arabic": "الطُّهُورُ شَطْرُ الإِيمَانِ",
-        "english": "Purity is half of faith.",
-        "narrator": "Abu Malik Al-Ash'ari",
-    },
-]
-
-def fetch(book=None, number=None):
-    candidates = [(book, "Sahih Hadith")] if book else random.sample(BOOKS, k=min(3, len(BOOKS)))
-    for b_code, b_name in candidates:
-        try:
-            num = number if number else random.randint(1, 200)
-            url = f"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-{b_code}/{num}.json"
-            r = requests.get(url, timeout=12)
-            if r.status_code == 200:
-                data = r.json()
-                eng_text = ""
-                if isinstance(data, dict):
-                    if "hadiths" in data and isinstance(data["hadiths"], list) and data["hadiths"]:
-                        eng_text = str(data["hadiths"][0].get("text", "")).strip()
-                    elif "text" in data:
-                        eng_text = str(data.get("text", "")).strip()
-                if eng_text:
-                    return {
-                        "collection": b_name,
-                        "number": str(num),
-                        "arabic": "",
-                        "english": eng_text,
-                        "narrator": b_name,
-                    }
-        except Exception:
-            continue
-    return random.choice(FALLBACK_HADITHS)
-'''
-              fawaz_file.write_text(fawaz_code, encoding="utf-8")
+              fawaz_src = (
+                  "import random\n"
+                  "import requests\n\n"
+                  "BOOKS = [\n"
+                  '    ("bukhari", "Sahih al-Bukhari"),\n'
+                  '    ("muslim", "Sahih Muslim"),\n'
+                  '    ("abudawud", "Sunan Abi Dawud"),\n'
+                  '    ("tirmidhi", "Jami at-Tirmidhi"),\n'
+                  '    ("nasai", "Sunan an-Nasa\'i"),\n'
+                  '    ("ibnmajah", "Sunan Ibn Majah"),\n'
+                  "]\n\n"
+                  "FALLBACK_HADITHS = [\n"
+                  "    {\n"
+                  '        "collection": "Sahih al-Bukhari",\n'
+                  '        "number": "1",\n'
+                  '        "arabic": "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",\n'
+                  '        "english": "The reward of deeds depends upon the intentions and every person will get the reward according to what he has intended.",\n'
+                  '        "narrator": "Umar bin Al-Khattab",\n'
+                  "    },\n"
+                  "    {\n"
+                  '        "collection": "Sahih Muslim",\n'
+                  '        "number": "223",\n'
+                  '        "arabic": "الطُّهُورُ شَطْرُ الإِيمَانِ",\n'
+                  '        "english": "Purity is half of faith.",\n'
+                  '        "narrator": "Abu Malik Al-Ash\'ari",\n'
+                  "    },\n"
+                  "]\n\n"
+                  "def fetch(book=None, number=None):\n"
+                  '    candidates = [(book, "Sahih Hadith")] if book else random.sample(BOOKS, k=min(3, len(BOOKS)))\n'
+                  "    for b_code, b_name in candidates:\n"
+                  "        try:\n"
+                  "            num = number if number else random.randint(1, 200)\n"
+                  '            url = f"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-{b_code}/{num}.json"\n'
+                  "            r = requests.get(url, timeout=12)\n"
+                  "            if r.status_code == 200:\n"
+                  "                data = r.json()\n"
+                  '                eng_text = ""\n'
+                  "                if isinstance(data, dict):\n"
+                  '                    if "hadiths" in data and isinstance(data["hadiths"], list) and data["hadiths"]:\n'
+                  '                        eng_text = str(data["hadiths"][0].get("text", "")).strip()\n'
+                  '                    elif "text" in data:\n'
+                  '                        eng_text = str(data.get("text", "")).strip()\n'
+                  "                if eng_text:\n"
+                  "                    return {\n"
+                  '                        "collection": b_name,\n'
+                  '                        "number": str(num),\n'
+                  '                        "arabic": "",\n'
+                  '                        "english": eng_text,\n'
+                  '                        "narrator": b_name,\n'
+                  "                    }\n"
+                  "        except Exception:\n"
+                  "            continue\n"
+                  "    return random.choice(FALLBACK_HADITHS)\n"
+              )
+              fawaz_file.write_text(fawaz_src, encoding="utf-8")
               print("✅ Created Sources/fawaz.py")
 
-          path_replacements = [
-              ('os.path.dirname(os.path.dirname(CURRENT_DIR))', 'os.path.dirname(CURRENT_DIR)'),
-              ('os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))', 'os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'),
-              ('os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "URL", "Islamic")', 'os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Sources")'),
-              ('os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "URL", "TTS_Translation")', 'os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Sources")'),
-              ('os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Uploader")', 'os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Story", "Uploader")'),
-              ('"API/AI_Models"', '"Sources"'),
-              ('"API/Video_Sources"', '"Sources"'),
-              ('"API/Music_Sources"', '"Sources"'),
-              ('"API/Photo_Sources"', '"Sources"'),
-              ('"API/Islamic_Content"', '"Sources"'),
-              ('"API/Audio_Text"', '"Sources"'),
-              ('"URL/Media"', '"Sources"'),
-              ('"URL/Islamic"', '"Sources"'),
-              ('"URL/TTS_Translation"', '"Sources"'),
-              ('"URL/Text_Content"', '"Sources"'),
-              ('"Story/Pipeline_Orchestration"', '"Story"'),
-              ('"Story/Final_Render"', '"Story"'),
-              ('"Story/Subtitles_Text"', '"Story"'),
-              ('"Story/Thumbnails"', '"Story"'),
-              ('"Uploader"', '"Story/Uploader"'),
-              ('"Config/App_Configs"', '"Assets_Config"'),
-              ('os.path.join(dev_root, "API", "AI_Models")', 'os.path.join(dev_root, "Sources")'),
-              ('os.path.join(DEV_ROOT, "API", "Video_Sources")', 'os.path.join(DEV_ROOT, "Sources")'),
-          ]
-
-          for py_file in ROOT.rglob("*.py"):
-              if ".git" in py_file.parts:
-                  continue
-              txt = py_file.read_text(encoding="utf-8", errors="ignore")
-              new_txt = txt
-              for old, new in path_replacements:
-                  new_txt = new_txt.replace(old, new)
-              if new_txt != txt:
-                  py_file.write_text(new_txt, encoding="utf-8")
-                  print(f"Updated paths in: {py_file.relative_to(ROOT)}")
-          PYEOF
-
-      - name: 💾 Commit & Push Fixes to Development
-        run: |
-          set -e
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git status --short
-          git add -A
-          if git diff --cached --quiet; then
-            echo "ℹ️ Nothing to commit."
-          else
-            git commit -m "fix: add Sources/fawaz.py and update module paths for new layout"
-            git push
-          fi
