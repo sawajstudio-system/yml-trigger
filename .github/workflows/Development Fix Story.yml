@@ -1,32 +1,29 @@
-name: 🔄 One-Time Migrate to Deployment Structure
+name: 🔄 One-Time Migrate Development to Deployment/
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout Repo
+      - name: 📥 Checkout Development Repo
         uses: actions/checkout@v4
         with:
+          repository: "${{ github.repository_owner }}/Development"
+          token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
       - name: 🏗️ Create Deployment Structure & Migrate Files
         run: |
           python3 - <<'PYEOF'
           import os
-          import re
           import shutil
           from pathlib import Path
 
           ROOT = Path(".").resolve()
           DEPLOY = ROOT / "Deployment"
 
-          # 1. Create target directories
           dirs = [
               DEPLOY / "Sources" / "Fallback",
               DEPLOY / "Sources" / "Intro",
@@ -39,7 +36,6 @@ jobs:
           for d in dirs:
               d.mkdir(parents=True, exist_ok=True)
 
-          # 2. Helper to copy file if exists
           def copy_if_exists(src_rel, dst_rel):
               s = ROOT / src_rel
               d = DEPLOY / dst_rel
@@ -49,12 +45,10 @@ jobs:
                   return True
               return False
 
-          # 3. Root files
           copy_if_exists(".gitignore", ".gitignore")
           copy_if_exists("requirements.txt", "requirements.txt")
           (DEPLOY / "Story" / ".gitkeep").touch()
 
-          # 4. Sources files
           source_map = {
               "API/AI_Models/anges.py": "Sources/anges.py",
               "API/AI_Models/cloudflare.py": "Sources/cloudflare.py",
@@ -108,14 +102,13 @@ jobs:
           for s, d in source_map.items():
               copy_if_exists(s, d)
 
-          # 5. Assets + Config -> Assets_Config
           assets_dir = ROOT / "Assets"
           if assets_dir.exists():
               for f in assets_dir.iterdir():
                   if f.is_file() and f.name != "__init__.py":
                       shutil.copy2(f, DEPLOY / "Assets_Config" / f.name)
 
-          config_keep = {
+          config_keep = [
               "Config/App_Configs/app_config.json",
               "Config/Language_Settings/ar_font_settings.json",
               "Config/Language_Settings/ar_strings.json",
@@ -132,12 +125,11 @@ jobs:
               "Config/Template_Settings/thumb_style_1.json",
               "Config/Template_Settings/thumb_style_2.json",
               "Config/App_Configs/video_settings.json",
-          }
+          ]
           for cfg in config_keep:
               fname = Path(cfg).name
               copy_if_exists(cfg, f"Assets_Config/{fname}")
 
-          # 6. Update fallback module names & Assets_Config paths inside copied .py files
           replacements = {
               "ai_fallback": "all_ai_fallback",
               "audio_text_url_fallback": "all_audio_text_url_fallback",
@@ -157,13 +149,14 @@ jobs:
                   txt = txt.replace(old, new)
               py_file.write_text(txt, encoding="utf-8")
 
-          print("✅ Migration completed into Deployment/")
+          print("📂 Created files count:", len(list(DEPLOY.rglob("*"))))
           PYEOF
 
-      - name: 💾 Commit & Push Deployment Folder
+      - name: 💾 Push Deployment/ to Development Repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git status --short
           git add Deployment/
-          git commit -m "chore: migrate project structure to Deployment/" || echo "Nothing to commit"
+          git commit -m "chore: create Deployment folder structure"
           git push
