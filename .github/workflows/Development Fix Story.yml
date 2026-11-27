@@ -1,16 +1,16 @@
-name: ♻️ Restore Development Repo Files
+name: 🧹 Delete Only One Subfolder Inside Development Repo
 
 on:
   workflow_dispatch:
     inputs:
-      commit_ref:
-        description: "Kis commit par wapas jana hai? (Default: HEAD~1)"
+      subfolder_name:
+        description: "Development repo ke andar kaunsa 1 galat folder hatana hai? (Default: Deployment)"
         required: false
-        default: "HEAD~1"
+        default: "Deployment"
         type: string
 
 jobs:
-  restore:
+  remove_only_subfolder:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -20,18 +20,43 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: ♻️ Restore Files from Previous Commit
+      - name: 🧹 Remove Only Specified Subfolder
         env:
-          COMMIT_REF: ${{ inputs.commit_ref }}
+          SUBFOLDER: ${{ inputs.subfolder_name }}
         run: |
-          git log -n 5 --oneline
-          REF="${COMMIT_REF:-HEAD~1}"
-          echo "Restoring tree to: $REF"
-          git checkout "$REF" -- .
+          set -e
+          NAME="$(echo "$SUBFOLDER" | xargs)"
+          NAME="${NAME#/}"
+          NAME="${NAME%/}"
+
+          if [ -z "$NAME" ] || [ "$NAME" = "." ] || [ "$NAME" = ".." ]; then
+            echo "❌ Invalid folder name: '$SUBFOLDER'"
+            exit 1
+          fi
+
+          if [ -e "$NAME" ]; then
+            git rm -r --ignore-unmatch "$NAME"
+            rm -rf "$NAME"
+            echo "✅ Removed only '$NAME/' inside Development repo."
+          else
+            echo "ℹ️ '$NAME/' does not exist in Development repo."
+          fi
+
+          git status --short
+
+      - name: 💾 Commit & Push Only That Change
+        env:
+          SUBFOLDER: ${{ inputs.subfolder_name }}
+        run: |
+          set -e
+          NAME="$(echo "$SUBFOLDER" | xargs)"
+          NAME="${NAME#/}"
+          NAME="${NAME%/}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git status --short
-          git add -A
-          git commit -m "chore: restore Development files from $REF" || echo "Nothing to commit"
-          git push
-          
+          if git diff --cached --quiet; then
+            echo "ℹ️ Nothing to commit."
+          else
+            git commit -m "chore: remove folder $NAME inside Development"
+            git push
+          fi
