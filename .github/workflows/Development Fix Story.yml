@@ -1,16 +1,10 @@
-name: 🧹 Delete Only One Subfolder Inside Development Repo
+name: 📦 Safe Move Deployment Contents to Root (No Wipe)
 
 on:
   workflow_dispatch:
-    inputs:
-      subfolder_name:
-        description: "Development repo ke andar kaunsa 1 galat folder hatana hai? (Default: Deployment)"
-        required: false
-        default: "Deployment"
-        type: string
 
 jobs:
-  remove_only_subfolder:
+  move_to_root:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -20,43 +14,52 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: 🧹 Remove Only Specified Subfolder
-        env:
-          SUBFOLDER: ${{ inputs.subfolder_name }}
+      - name: 📦 Move Contents of Deployment/ to Root (Without Destroying Anything)
         run: |
-          set -e
-          NAME="$(echo "$SUBFOLDER" | xargs)"
-          NAME="${NAME#/}"
-          NAME="${NAME%/}"
+          python3 - <<'PYEOF'
+          import shutil
+          from pathlib import Path
 
-          if [ -z "$NAME" ] || [ "$NAME" = "." ] || [ "$NAME" = ".." ]; then
-            echo "❌ Invalid folder name: '$SUBFOLDER'"
-            exit 1
-          fi
+          ROOT = Path(".").resolve()
+          DEPLOY = ROOT / "Deployment"
 
-          if [ -e "$NAME" ]; then
-            git rm -r --ignore-unmatch "$NAME"
-            rm -rf "$NAME"
-            echo "✅ Removed only '$NAME/' inside Development repo."
-          else
-            echo "ℹ️ '$NAME/' does not exist in Development repo."
-          fi
+          if not DEPLOY.exists() or not DEPLOY.is_dir():
+              print("ℹ️ Deployment/ folder not found at root.")
+              raise SystemExit(0)
 
-          git status --short
+          for item in list(DEPLOY.iterdir()):
+              dest = ROOT / item.name
+              if item.is_dir():
+                  # Merge directory into root without wiping existing root files
+                  shutil.copytree(item, dest, dirs_exist_ok=True)
+                  shutil.rmtree(item)
+                  print(f"Moved folder to root: {item.name}/")
+              else:
+                  # Copy file if not already present at root, then remove from Deployment/
+                  if not dest.exists():
+                      shutil.copy2(item, dest)
+                      print(f"Copied file to root: {item.name}")
+                  else:
+                      print(f"Kept existing root file: {item.name}")
+                  item.unlink()
 
-      - name: 💾 Commit & Push Only That Change
-        env:
-          SUBFOLDER: ${{ inputs.subfolder_name }}
+          # Remove Deployment/ only if completely empty
+          if not any(DEPLOY.iterdir()):
+              DEPLOY.rmdir()
+              print("✅ Removed empty Deployment/ folder; all inner items are now in root.")
+          else:
+              print("⚠️ Deployment/ still has items:", list(DEPLOY.iterdir()))
+          PYEOF
+
+      - name: 💾 Commit & Push to Development
         run: |
-          set -e
-          NAME="$(echo "$SUBFOLDER" | xargs)"
-          NAME="${NAME#/}"
-          NAME="${NAME%/}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git status --short
+          git add -A
           if git diff --cached --quiet; then
             echo "ℹ️ Nothing to commit."
           else
-            git commit -m "chore: remove folder $NAME inside Development"
+            git commit -m "chore: move Deployment contents directly to Development root"
             git push
           fi
