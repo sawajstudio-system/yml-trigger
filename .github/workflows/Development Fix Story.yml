@@ -1,15 +1,10 @@
-name: 🗑️ Delete One Folder from Development Repo
+name: 🗑️ Delete Deployment Folder from Development Repo
 
 on:
   workflow_dispatch:
-    inputs:
-      folder_name:
-        description: "Development repo se kaunsa 1 folder delete karna hai (e.g. API, Assets, Config, Story, URL, Uploader)"
-        required: true
-        type: string
 
 jobs:
-  delete_one_folder:
+  delete_deployment:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -19,35 +14,24 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: 🗑️ Delete Target Folder
-        env:
-          FOLDER_NAME: ${{ inputs.folder_name }}
+      - name: 🗑️ Delete Root Deployment/ Folder
         run: |
           python3 - <<'PYEOF'
-          import os
           import shutil
           from pathlib import Path
 
-          ROOT = Path(".").resolve()
-          target = os.environ.get("FOLDER_NAME", "").strip().strip("/")
-
-          if not target or target == "Deployment":
-              raise ValueError("Invalid or protected folder name.")
-
-          p = ROOT / target
-          if p.exists() and p.is_dir():
-              shutil.rmtree(p)
-              print(f"✅ Deleted folder: {target}/")
+          target = Path(".").resolve() / "Deployment"
+          if target.exists() and target.is_dir():
+              shutil.rmtree(target)
+              print("✅ Deleted root Deployment/ folder.")
           else:
-              print(f"⚠️ Folder not found: {target}/")
+              print("⚠️ Deployment/ folder not found at root.")
           PYEOF
 
-      - name: 💾 Commit & Push to Development
-        env:
-          FOLDER_NAME: ${{ inputs.folder_name }}
+      - name: 💾 Commit & Push Deletion
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: delete folder ${{ inputs.folder_name }}" || echo "Nothing to commit"
+          git commit -m "chore: remove incorrect Deployment folder" || echo "Nothing to commit"
           git push
