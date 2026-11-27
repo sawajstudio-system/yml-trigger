@@ -1,75 +1,108 @@
-name: 📂 Move Sources, Assets_Config & Story to Development Root (One-Time)
+name: 🎬 devloment testing Story🔴🔴🔴
 
 on:
   workflow_dispatch:
 
+concurrency:
+  group: story-pipeline
+  cancel-in-progress: false
+
 jobs:
-  flatten_root:
+  run_video:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      # ── 🟢 CORE & API KEYS ──
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+      # ── ☁️ GOOGLE DRIVE ──
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+
+      # ── 🧠 AI MODELS ──
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
+      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
+      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
+
+      # ── 🎬 MEDIA & AUDIO ──
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+
     steps:
-      - name: 📥 Checkout Development Repo
+      - name: 1. 📥 Checkout Development Repo
         uses: actions/checkout@v4
         with:
           repository: "${{ github.repository_owner }}/Development"
           token: ${{ secrets.TOKEN_GITHUB }}
-          fetch-depth: 0
 
-      - name: 📂 Move Inner Folders Directly to Root & Remove Deployment Wrapper
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 3. 📦 Install FFmpeg & Fonts
         run: |
-          python3 - <<'PYEOF'
-          import shutil
-          from pathlib import Path
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
 
-          ROOT = Path(".").resolve()
-          DEPLOY = ROOT / "Deployment"
-
-          if DEPLOY.exists() and DEPLOY.is_dir():
-              for item in list(DEPLOY.iterdir()):
-                  dest = ROOT / item.name
-                  if item.is_dir():
-                      shutil.copytree(item, dest, dirs_exist_ok=True)
-                      shutil.rmtree(item)
-                      print(f"Moved folder to Development root: {item.name}/")
-                  else:
-                      if item.name not in {".gitignore", "requirements.txt"}:
-                          if not dest.exists():
-                              shutil.copy2(item, dest)
-                      item.unlink()
-
-              # Remove Deployment wrapper folder if empty
-              if DEPLOY.exists() and not any(DEPLOY.iterdir()):
-                  DEPLOY.rmdir()
-                  print("Removed empty Deployment/ wrapper folder.")
-
-          # Ensure no accidental Development/ subfolder exists inside Development repo
-          accidental_dev = ROOT / "Development"
-          if accidental_dev.exists() and accidental_dev.is_dir():
-              for item in list(accidental_dev.iterdir()):
-                  dest = ROOT / item.name
-                  if item.is_dir():
-                      shutil.copytree(item, dest, dirs_exist_ok=True)
-                      shutil.rmtree(item)
-                  else:
-                      if not dest.exists():
-                          shutil.copy2(item, dest)
-                      item.unlink()
-              if not any(accidental_dev.iterdir()):
-                  accidental_dev.rmdir()
-                  print("Removed accidental inner Development/ folder.")
-
-          print("Root items now:", sorted(p.name for p in ROOT.iterdir() if p.name != ".git"))
-          PYEOF
-
-      - name: 💾 Commit & Push Flattened Root to Development
+      - name: 4. 📥 Install Python Packages
         run: |
-          set -e
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git status --short
-          git add -A
-          if git diff --cached --quiet; then
-            echo "ℹ️ Nothing to commit."
+          python -m pip install --upgrade pip
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          elif [ -f "Story/requirements.txt" ]; then
+            pip install -r Story/requirements.txt
           else
-            git commit -m "chore: place Sources, Assets_Config, and Story directly at Development root"
-            git push
+            pip install requests edge-tts google-api-python-client google-auth-httplib2 google-auth-oauthlib Pillow mutagen numpy PyYAML
           fi
+
+      - name: 5. 🔍 Verify Structure
+        run: |
+          echo "📂 Story files:"
+          find Story -maxdepth 2 -type f | sort
+          echo ""
+          echo "📂 Sources files:"
+          find Sources -maxdepth 2 -type f | sort
+          echo ""
+          echo "📂 Assets_Config:"
+          ls -la Assets_Config/
+
+      - name: 6. 🎬 Run Story Pipeline
+        working-directory: Story
+        env:
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/Sources:${{ github.workspace }}/Sources/Fallback:${{ github.workspace }}/Sources/Intro:${{ github.workspace }}/Sources/Outro:${{ github.workspace }}/Sources/CTA:${{ github.workspace }}/Assets_Config:${{ github.workspace }}/Story:${{ github.workspace }}/Story/Uploader"
+        run: |
+          echo "🚀 Starting Story Pipeline..."
+          python -u composer.py
+
+      - name: 7. 📤 Check Output
+        if: always()
+        run: |
+          VIDEO="Story/temp/Final_Story.mp4"
+          if [ -f "$VIDEO" ]; then
+            echo "✅ VIDEO BANA!"
+            du -h "$VIDEO"
+          else
+            echo "ℹ️ Pipeline completed (temp/ may already be cleaned up after Drive upload)."
+            ls -la Story/ 2>/dev/null || true
+          fi
+
+      - name: 8. 🧹 Cleanup
+        if: always()
+        run: rm -rf Story/temp temp 2>/dev/null || true
