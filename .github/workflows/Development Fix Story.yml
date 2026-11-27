@@ -1,10 +1,16 @@
-name: 🗑️ Delete Deployment Folder from Development Repo
+name: ♻️ Restore Development Repo Files
 
 on:
   workflow_dispatch:
+    inputs:
+      commit_ref:
+        description: "Kis commit par wapas jana hai? (Default: HEAD~1)"
+        required: false
+        default: "HEAD~1"
+        type: string
 
 jobs:
-  delete_deployment:
+  restore:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -14,24 +20,18 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: 🗑️ Delete Root Deployment/ Folder
+      - name: ♻️ Restore Files from Previous Commit
+        env:
+          COMMIT_REF: ${{ inputs.commit_ref }}
         run: |
-          python3 - <<'PYEOF'
-          import shutil
-          from pathlib import Path
-
-          target = Path(".").resolve() / "Deployment"
-          if target.exists() and target.is_dir():
-              shutil.rmtree(target)
-              print("✅ Deleted root Deployment/ folder.")
-          else:
-              print("⚠️ Deployment/ folder not found at root.")
-          PYEOF
-
-      - name: 💾 Commit & Push Deletion
-        run: |
+          git log -n 5 --oneline
+          REF="${COMMIT_REF:-HEAD~1}"
+          echo "Restoring tree to: $REF"
+          git checkout "$REF" -- .
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git status --short
           git add -A
-          git commit -m "chore: remove incorrect Deployment folder" || echo "Nothing to commit"
+          git commit -m "chore: restore Development files from $REF" || echo "Nothing to commit"
           git push
+          
