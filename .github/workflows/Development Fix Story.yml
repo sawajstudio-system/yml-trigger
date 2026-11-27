@@ -63,56 +63,31 @@ jobs:
 
       - name: 4. 🎨 Write 3-Language + Dot + Gradient Bar ass_builder.py
         run: |
-          python3 - <<'PYEOF'
-          from pathlib import Path
-
-          ROOT = Path(".").resolve()
-          ass_path = ROOT / "Story" / "ass_builder.py"
-          ass_path.parent.mkdir(parents=True, exist_ok=True)
-
-          code = '''# --- AUTO PATH BOOTSTRAP ---
+          mkdir -p Story
+          cat <<'EOF' > Story/ass_builder.py
 import os as _os, sys as _sys
 _HERE = _os.path.dirname(_os.path.abspath(__file__))
 _ROOT = _HERE
 for _ in range(4):
-    if _os.path.isdir(_os.path.join(_ROOT, 'Sources')) and _os.path.isdir(_os.path.join(_ROOT, 'Story')):
+    if _os.path.isdir(_os.path.join(_ROOT, "Sources")) and _os.path.isdir(_os.path.join(_ROOT, "Story")):
         break
     _ROOT = _os.path.dirname(_ROOT)
-for _sub in ['', 'Sources', 'Sources/Fallback', 'Sources/Intro', 'Sources/Outro', 'Sources/CTA', 'Assets_Config', 'Story', 'Story/Uploader']:
+for _sub in ["", "Sources", "Sources/Fallback", "Sources/Intro", "Sources/Outro", "Sources/CTA", "Assets_Config", "Story", "Story/Uploader"]:
     _p = _os.path.join(_ROOT, _sub) if _sub else _ROOT
     if _os.path.isdir(_p) and _p not in _sys.path:
         _sys.path.insert(0, _p)
-# --- END AUTO PATH BOOTSTRAP ---
 
 import os
 import re
 
-DOT_PALETTE = [
-    "&H003898FF&",
-    "&H00FFCC44&",
-    "&H0018B8FF&",
-    "&H0078FF88&",
-    "&H00FF78E8&",
-    "&H00FFFF66&",
-]
-
-WORD_PALETTE = [
-    "&H00FFCC44&",
-    "&H0088FF99&",
-    "&H0022E8FF&",
-    "&H00FF78E8&",
-    "&H0055AAFF&",
-    "&H00FFFF66&",
-    "&H00FFA866&",
-]
-
+DOT_PALETTE = ["&H003898FF&", "&H00FFCC44&", "&H0018B8FF&", "&H0078FF88&", "&H00FF78E8&", "&H00FFFF66&"]
+WORD_PALETTE = ["&H00FFCC44&", "&H0088FF99&", "&H0022E8FF&", "&H00FF78E8&", "&H0055AAFF&", "&H00FFFF66&", "&H00FFA866&"]
 BAR_GRADIENT_SETS = [
     ["&H003898FF&", "&H0022E8FF&", "&H0088FF99&", "&H00FFCC44&", "&H00FF78E8&"],
     ["&H00FFCC44&", "&H00FFFF66&", "&H0078FF88&", "&H0018B8FF&", "&H0055AAFF&"],
     ["&H00FF78E8&", "&H0055AAFF&", "&H0022E8FF&", "&H0088FF99&", "&H00FFCC44&"],
     ["&H0078FF88&", "&H00FFCC44&", "&H00FF78E8&", "&H003898FF&", "&H0022E8FF&"],
 ]
-
 
 def _fmt_ts(sec):
     sec = max(0.0, float(sec))
@@ -122,26 +97,17 @@ def _fmt_ts(sec):
     cs = min(99, int(round((sec - int(sec)) * 100)))
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
-
 def _split_2_to_3_words(text):
     words = [w.strip() for w in str(text or "").split() if w.strip()]
     if not words:
         return []
-    chunks = []
-    i = 0
-    n = len(words)
+    chunks, i, n = [], 0, len(words)
     while i < n:
         rem = n - i
-        if rem <= 3:
-            step = rem
-        elif rem == 4:
-            step = 2
-        else:
-            step = 3
+        step = rem if rem <= 3 else (2 if rem == 4 else 3)
         chunks.append(" ".join(words[i:i + step]))
         i += step
     return chunks
-
 
 def _colorize_words(chunk_text, step_idx, lang_offset=0):
     words = [w for w in str(chunk_text or "").split() if w]
@@ -150,29 +116,26 @@ def _colorize_words(chunk_text, step_idx, lang_offset=0):
     parts = []
     for w_idx, word in enumerate(words):
         col = WORD_PALETTE[(step_idx * 3 + lang_offset * 2 + w_idx) % len(WORD_PALETTE)]
-        parts.append(f"{{\\\\1c{col}}}{word}")
+        parts.append("{\\1c" + col + "}" + word)
     return " ".join(parts)
-
 
 def _build_gradient_bar(step_idx, row_idx, x_start=165, x_end=925, y_pos=882):
     palette = BAR_GRADIENT_SETS[(step_idx + row_idx) % len(BAR_GRADIENT_SETS)]
     segments = len(palette)
     seg_w = (x_end - x_start) / segments
-    bar_items = []
+    items = []
     for s_idx, col in enumerate(palette):
         sx = int(round(x_start + s_idx * seg_w))
         ex = int(round(x_start + (s_idx + 1) * seg_w))
         w = max(1, ex - sx)
-        draw_cmd = f"m 0 0 l {w} 0 l {w} 8 l 0 8"
-        bar_items.append((sx, y_pos, col, draw_cmd))
-    return bar_items
-
+        items.append((sx, y_pos, col, f"m 0 0 l {w} 0 l {w} 8 l 0 8"))
+    return items
 
 def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_subtitles.ass"):
     hadith_dict = hadith if isinstance(hadith, dict) else {}
-    ara_src = re.sub(r'[\\"\\n\\r]', " ", str(hadith_dict.get("arabic", ""))).strip()
-    hin_src = re.sub(r'[\\"\\n\\r]', " ", str(hindi_text or "")).strip()
-    eng_src = re.sub(r'[\\"\\n\\r]', " ", str(hadith_dict.get("english", ""))).strip()
+    ara_src = re.sub(r'["\n\r]', " ", str(hadith_dict.get("arabic", ""))).strip()
+    hin_src = re.sub(r'["\n\r]', " ", str(hindi_text or "")).strip()
+    eng_src = re.sub(r'["\n\r]', " ", str(hadith_dict.get("english", ""))).strip()
 
     ara_parts = _split_2_to_3_words(ara_src)
     hin_parts = _split_2_to_3_words(hin_src)
@@ -214,50 +177,35 @@ def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_s
         e = s + step_dur
         ts_s = _fmt_ts(s)
         ts_e = _fmt_ts(e)
-
         vals = {
             "ara": ara_parts[i % len(ara_parts)] if ara_parts else "",
             "hin": hin_parts[i % len(hin_parts)] if hin_parts else "",
             "eng": eng_parts[i % len(eng_parts)] if eng_parts else "",
         }
-
         for r_idx, (key, text_y, bar_y, text_x, style_name, lang_off) in enumerate(rows_config):
             val = vals[key]
             if not val:
                 continue
-
             dot_col = DOT_PALETTE[(i * 2 + r_idx) % len(DOT_PALETTE)]
-            lines.append(
-                f"Dialogue: 1,{ts_s},{ts_e},DotRow,,,0,0,,"
-                f"{{\\\\pos(115,{text_y})\\\\1c{dot_col}\\\\3c&H000000&\\\\blur1}}●"
-            )
-            lines.append(
-                f"Dialogue: 2,{ts_s},{ts_e},{style_name},,,0,0,,"
-                f"{{\\\\pos({text_x},{text_y})\\\\3c&H000000&\\\\blur1}}{_colorize_words(val, i, lang_off)}"
-            )
+            lines.append(f"Dialogue: 1,{ts_s},{ts_e},DotRow,,,0,0,,{{\\pos(115,{text_y})\\1c{dot_col}\\3c&H000000&\\blur1}}●")
+            lines.append(f"Dialogue: 2,{ts_s},{ts_e},{style_name},,,0,0,,{{\\pos({text_x},{text_y})\\3c&H000000&\\blur1}}{_colorize_words(val, i, lang_off)}")
             for sx, sy, b_col, draw_cmd in _build_gradient_bar(i, r_idx, x_start=165, x_end=925, y_pos=bar_y):
-                lines.append(
-                    f"Dialogue: 0,{ts_s},{ts_e},GradBar,,,0,0,,"
-                    f"{{\\\\pos({sx},{sy})\\\\1c{b_col}\\\\bord0\\\\shad0\\\\blur2\\\\p1}}{draw_cmd}{{\\\\p0}}"
-                )
+                lines.append(f"Dialogue: 0,{ts_s},{ts_e},GradBar,,,0,0,,{{\\pos({sx},{sy})\\1c{b_col}\\bord0\\shad0\\blur2\\p1}}{draw_cmd}{{\\p0}}")
 
     out_dir = os.path.dirname(output_path) or "temp"
     os.makedirs(out_dir, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\\n".join(header + lines) + "\\n")
+        f.write("\n".join(header + lines) + "\n")
     return output_path
-
 
 def create_intro_subtitle(intro_text, duration=3.5, output_path="temp/intro_sub.ass"):
     return None
 
-
 def create_outro_subtitle(outro_text, total_duration, outro_duration=3.5, output_path="temp/outro_sub.ass"):
     return None
-'''
-          ass_path.write_text(code, encoding="utf-8")
-          print("✅ Updated Story/ass_builder.py")
-          PYEOF
+EOF
+          python3 -m py_compile Story/ass_builder.py
+          echo "✅ Story/ass_builder.py compiled cleanly!"
 
       - name: 5. 💾 Save to Development Repo
         run: |
