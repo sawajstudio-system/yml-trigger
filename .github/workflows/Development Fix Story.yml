@@ -1,10 +1,10 @@
-name: 📦 Safe Move Deployment Contents to Root (No Wipe)
+name: ♻️ Step 1 - Restore All Old Folders to Development
 
 on:
   workflow_dispatch:
 
 jobs:
-  move_to_root:
+  restore_old:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -14,45 +14,18 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: 📦 Move Contents of Deployment/ to Root (Without Destroying Anything)
+      - name: 🔍 Find Commit Before Deployment Deletion & Restore
         run: |
-          python3 - <<'PYEOF'
-          import shutil
-          from pathlib import Path
-
-          ROOT = Path(".").resolve()
-          DEPLOY = ROOT / "Deployment"
-
-          if not DEPLOY.exists() or not DEPLOY.is_dir():
-              print("ℹ️ Deployment/ folder not found at root.")
-              raise SystemExit(0)
-
-          for item in list(DEPLOY.iterdir()):
-              dest = ROOT / item.name
-              if item.is_dir():
-                  # Merge directory into root without wiping existing root files
-                  shutil.copytree(item, dest, dirs_exist_ok=True)
-                  shutil.rmtree(item)
-                  print(f"Moved folder to root: {item.name}/")
-              else:
-                  # Copy file if not already present at root, then remove from Deployment/
-                  if not dest.exists():
-                      shutil.copy2(item, dest)
-                      print(f"Copied file to root: {item.name}")
-                  else:
-                      print(f"Kept existing root file: {item.name}")
-                  item.unlink()
-
-          # Remove Deployment/ only if completely empty
-          if not any(DEPLOY.iterdir()):
-              DEPLOY.rmdir()
-              print("✅ Removed empty Deployment/ folder; all inner items are now in root.")
-          else:
-              print("⚠️ Deployment/ still has items:", list(DEPLOY.iterdir()))
-          PYEOF
-
-      - name: 💾 Commit & Push to Development
-        run: |
+          set -e
+          git log -n 10 --oneline
+          # Find the most recent commit that has API/ or Story/
+          GOOD_COMMIT=$(git rev-list -n 15 HEAD -- API Story Assets Config URL Uploader | head -n 1)
+          echo "Found commit with old folders: $GOOD_COMMIT"
+          if [ -z "$GOOD_COMMIT" ]; then
+            echo "❌ Could not find a commit with old folders in history."
+            exit 1
+          fi
+          git checkout "$GOOD_COMMIT" -- API Assets Config Story URL Uploader .gitignore requirements.txt
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git status --short
@@ -60,6 +33,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "ℹ️ Nothing to commit."
           else
-            git commit -m "chore: move Deployment contents directly to Development root"
+            git commit -m "chore: restore API, Assets, Config, Story, URL, Uploader from $GOOD_COMMIT"
             git push
           fi
+          
