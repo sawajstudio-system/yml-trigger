@@ -1,4 +1,4 @@
-name: 🛠️ Fix All Paths, Add fawaz.py & Run Story Pipeline
+name: 🎨 Update 3-Lang Subtitle Style & Run Story
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  fix_and_run:
+  update_and_run:
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -61,155 +61,218 @@ jobs:
             pip install requests edge-tts google-api-python-client google-auth-httplib2 google-auth-oauthlib Pillow mutagen numpy PyYAML
           fi
 
-      - name: 4. 🔧 Create Sources/fawaz.py & Fix All Code Paths (Zero Delete)
+      - name: 4. 🎨 Write 3-Language + Dot + Gradient Bar ass_builder.py
         run: |
           python3 - <<'PYEOF'
-          import py_compile
           from pathlib import Path
 
           ROOT = Path(".").resolve()
-          sources_dir = ROOT / "Sources"
-          sources_dir.mkdir(parents=True, exist_ok=True)
+          ass_path = ROOT / "Story" / "ass_builder.py"
+          ass_path.parent.mkdir(parents=True, exist_ok=True)
 
-          # 1. Create missing Sources/fawaz.py
-          fawaz_file = sources_dir / "fawaz.py"
-          if not fawaz_file.exists():
-              fawaz_src = (
-                  "import random\n"
-                  "import requests\n\n"
-                  "BOOKS = [\n"
-                  '    ("bukhari", "Sahih al-Bukhari"),\n'
-                  '    ("muslim", "Sahih Muslim"),\n'
-                  '    ("abudawud", "Sunan Abi Dawud"),\n'
-                  '    ("tirmidhi", "Jami at-Tirmidhi"),\n'
-                  '    ("nasai", "Sunan an-Nasa\'i"),\n'
-                  '    ("ibnmajah", "Sunan Ibn Majah"),\n'
-                  "]\n\n"
-                  "FALLBACK_HADITHS = [\n"
-                  "    {\n"
-                  '        "collection": "Sahih al-Bukhari",\n'
-                  '        "number": "1",\n'
-                  '        "arabic": "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",\n'
-                  '        "english": "The reward of deeds depends upon the intentions and every person will get the reward according to what he has intended.",\n'
-                  '        "narrator": "Umar bin Al-Khattab",\n'
-                  "    },\n"
-                  "    {\n"
-                  '        "collection": "Sahih Muslim",\n'
-                  '        "number": "223",\n'
-                  '        "arabic": "الطُّهُورُ شَطْرُ الإِيمَانِ",\n'
-                  '        "english": "Purity is half of faith.",\n'
-                  '        "narrator": "Abu Malik Al-Ash\'ari",\n'
-                  "    },\n"
-                  "]\n\n"
-                  "def fetch(book=None, number=None):\n"
-                  '    candidates = [(book, "Sahih Hadith")] if book else random.sample(BOOKS, k=min(3, len(BOOKS)))\n'
-                  "    for b_code, b_name in candidates:\n"
-                  "        try:\n"
-                  "            num = number if number else random.randint(1, 200)\n"
-                  '            url = f"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-{b_code}/{num}.json"\n'
-                  "            r = requests.get(url, timeout=12)\n"
-                  "            if r.status_code == 200:\n"
-                  "                data = r.json()\n"
-                  '                eng_text = ""\n'
-                  "                if isinstance(data, dict):\n"
-                  '                    if "hadiths" in data and isinstance(data["hadiths"], list) and data["hadiths"]:\n'
-                  '                        eng_text = str(data["hadiths"][0].get("text", "")).strip()\n'
-                  '                    elif "text" in data:\n'
-                  '                        eng_text = str(data.get("text", "")).strip()\n'
-                  "                if eng_text:\n"
-                  "                    return {\n"
-                  '                        "collection": b_name,\n'
-                  '                        "number": str(num),\n'
-                  '                        "arabic": "",\n'
-                  '                        "english": eng_text,\n'
-                  '                        "narrator": b_name,\n'
-                  "                    }\n"
-                  "        except Exception:\n"
-                  "            continue\n"
-                  "    return random.choice(FALLBACK_HADITHS)\n"
-              )
-              fawaz_file.write_text(fawaz_src, encoding="utf-8")
-              print("✅ Created Sources/fawaz.py")
+          code = '''# --- AUTO PATH BOOTSTRAP ---
+import os as _os, sys as _sys
+_HERE = _os.path.dirname(_os.path.abspath(__file__))
+_ROOT = _HERE
+for _ in range(4):
+    if _os.path.isdir(_os.path.join(_ROOT, 'Sources')) and _os.path.isdir(_os.path.join(_ROOT, 'Story')):
+        break
+    _ROOT = _os.path.dirname(_ROOT)
+for _sub in ['', 'Sources', 'Sources/Fallback', 'Sources/Intro', 'Sources/Outro', 'Sources/CTA', 'Assets_Config', 'Story', 'Story/Uploader']:
+    _p = _os.path.join(_ROOT, _sub) if _sub else _ROOT
+    if _os.path.isdir(_p) and _p not in _sys.path:
+        _sys.path.insert(0, _p)
+# --- END AUTO PATH BOOTSTRAP ---
 
-          # 2. Universal bootstrap header so any script finds Sources, Fallback, Intro, Outro, CTA, Story, Uploader, Assets_Config
-          BOOTSTRAP_BLOCK = (
-              "# --- AUTO PATH BOOTSTRAP ---\n"
-              "import os as _os, sys as _sys\n"
-              "_HERE = _os.path.dirname(_os.path.abspath(__file__))\n"
-              "_ROOT = _HERE\n"
-              "for _ in range(4):\n"
-              "    if _os.path.isdir(_os.path.join(_ROOT, 'Sources')) and _os.path.isdir(_os.path.join(_ROOT, 'Story')):\n"
-              "        break\n"
-              "    _ROOT = _os.path.dirname(_ROOT)\n"
-              "for _sub in ['', 'Sources', 'Sources/Fallback', 'Sources/Intro', 'Sources/Outro', 'Sources/CTA', 'Assets_Config', 'Story', 'Story/Uploader']:\n"
-              "    _p = _os.path.join(_ROOT, _sub) if _sub else _ROOT\n"
-              "    if _os.path.isdir(_p) and _p not in _sys.path:\n"
-              "        _sys.path.insert(0, _p)\n"
-              "# --- END AUTO PATH BOOTSTRAP ---\n"
-          )
+import os
+import re
 
-          # 3. Direct replacements for old folder strings
-          replacements = [
-              ('os.path.dirname(os.path.dirname(CURRENT_DIR))', 'os.path.dirname(CURRENT_DIR)'),
-              ('os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))', 'os.path.dirname(os.path.dirname(os.path.abspath(__file__)))'),
-              ('os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "URL", "Islamic")', 'os.path.join(_ROOT, "Sources")'),
-              ('os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "URL", "TTS_Translation")', 'os.path.join(_ROOT, "Sources")'),
-              ('os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Uploader")', 'os.path.join(_ROOT, "Story", "Uploader")'),
-              ('os.path.join(dev_root, "API", "AI_Models")', 'os.path.join(_ROOT, "Sources", "Fallback")'),
-              ('os.path.join(DEV_ROOT, "API", "Video_Sources")', 'os.path.join(_ROOT, "Sources", "Fallback")'),
-              ('"API/AI_Models"', '"Sources/Fallback"'),
-              ('"API/Video_Sources"', '"Sources/Fallback"'),
-              ('"API/Music_Sources"', '"Sources/Fallback"'),
-              ('"API/Photo_Sources"', '"Sources"'),
-              ('"API/Islamic_Content"', '"Sources/Fallback"'),
-              ('"API/Audio_Text"', '"Sources/Intro"'),
-              ('"URL/Media"', '"Sources"'),
-              ('"URL/Islamic"', '"Sources"'),
-              ('"URL/TTS_Translation"', '"Sources"'),
-              ('"URL/Text_Content"', '"Sources"'),
-              ('"Story/Pipeline_Orchestration"', '"Story"'),
-              ('"Story/Final_Render"', '"Story"'),
-              ('"Story/Subtitles_Text"', '"Story"'),
-              ('"Story/Thumbnails"', '"Sources/CTA"'),
-              ('"Uploader"', '"Story/Uploader"'),
-              ('"Config/App_Configs"', '"Assets_Config"'),
-              ('"Assets"', '"Assets_Config"'),
-              ("'Assets'", "'Assets_Config'"),
-          ]
+DOT_PALETTE = [
+    "&H003898FF&",
+    "&H00FFCC44&",
+    "&H0018B8FF&",
+    "&H0078FF88&",
+    "&H00FF78E8&",
+    "&H00FFFF66&",
+]
 
-          for py_file in sorted(ROOT.rglob("*.py")):
-              if ".git" in py_file.parts or py_file.name == "__init__.py":
-                  continue
-              txt = py_file.read_text(encoding="utf-8", errors="ignore")
-              new_txt = txt
-              for old, new in replacements:
-                  new_txt = new_txt.replace(old, new)
-              if "# --- AUTO PATH BOOTSTRAP ---" not in new_txt:
-                  new_txt = BOOTSTRAP_BLOCK + "\n" + new_txt
-              if new_txt != txt:
-                  py_file.write_text(new_txt, encoding="utf-8")
-                  print(f"🔧 Patched: {py_file.relative_to(ROOT)}")
-              # Compile check to ensure valid Python syntax
-              py_compile.compile(str(py_file), doraise=True)
+WORD_PALETTE = [
+    "&H00FFCC44&",
+    "&H0088FF99&",
+    "&H0022E8FF&",
+    "&H00FF78E8&",
+    "&H0055AAFF&",
+    "&H00FFFF66&",
+    "&H00FFA866&",
+]
 
-          print("✅ All Python files compiled cleanly with zero syntax errors!")
+BAR_GRADIENT_SETS = [
+    ["&H003898FF&", "&H0022E8FF&", "&H0088FF99&", "&H00FFCC44&", "&H00FF78E8&"],
+    ["&H00FFCC44&", "&H00FFFF66&", "&H0078FF88&", "&H0018B8FF&", "&H0055AAFF&"],
+    ["&H00FF78E8&", "&H0055AAFF&", "&H0022E8FF&", "&H0088FF99&", "&H00FFCC44&"],
+    ["&H0078FF88&", "&H00FFCC44&", "&H00FF78E8&", "&H003898FF&", "&H0022E8FF&"],
+]
+
+
+def _fmt_ts(sec):
+    sec = max(0.0, float(sec))
+    h = int(sec // 3600)
+    m = int((sec % 3600) // 60)
+    s = int(sec % 60)
+    cs = min(99, int(round((sec - int(sec)) * 100)))
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def _split_2_to_3_words(text):
+    words = [w.strip() for w in str(text or "").split() if w.strip()]
+    if not words:
+        return []
+    chunks = []
+    i = 0
+    n = len(words)
+    while i < n:
+        rem = n - i
+        if rem <= 3:
+            step = rem
+        elif rem == 4:
+            step = 2
+        else:
+            step = 3
+        chunks.append(" ".join(words[i:i + step]))
+        i += step
+    return chunks
+
+
+def _colorize_words(chunk_text, step_idx, lang_offset=0):
+    words = [w for w in str(chunk_text or "").split() if w]
+    if not words:
+        return ""
+    parts = []
+    for w_idx, word in enumerate(words):
+        col = WORD_PALETTE[(step_idx * 3 + lang_offset * 2 + w_idx) % len(WORD_PALETTE)]
+        parts.append(f"{{\\\\1c{col}}}{word}")
+    return " ".join(parts)
+
+
+def _build_gradient_bar(step_idx, row_idx, x_start=165, x_end=925, y_pos=882):
+    palette = BAR_GRADIENT_SETS[(step_idx + row_idx) % len(BAR_GRADIENT_SETS)]
+    segments = len(palette)
+    seg_w = (x_end - x_start) / segments
+    bar_items = []
+    for s_idx, col in enumerate(palette):
+        sx = int(round(x_start + s_idx * seg_w))
+        ex = int(round(x_start + (s_idx + 1) * seg_w))
+        w = max(1, ex - sx)
+        draw_cmd = f"m 0 0 l {w} 0 l {w} 8 l 0 8"
+        bar_items.append((sx, y_pos, col, draw_cmd))
+    return bar_items
+
+
+def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_subtitles.ass"):
+    hadith_dict = hadith if isinstance(hadith, dict) else {}
+    ara_src = re.sub(r'[\\"\\n\\r]', " ", str(hadith_dict.get("arabic", ""))).strip()
+    hin_src = re.sub(r'[\\"\\n\\r]', " ", str(hindi_text or "")).strip()
+    eng_src = re.sub(r'[\\"\\n\\r]', " ", str(hadith_dict.get("english", ""))).strip()
+
+    ara_parts = _split_2_to_3_words(ara_src)
+    hin_parts = _split_2_to_3_words(hin_src)
+    eng_parts = _split_2_to_3_words(eng_src)
+    steps = max(len(ara_parts), len(hin_parts), len(eng_parts), 1)
+
+    header = [
+        "[Script Info]",
+        "ScriptType: v4.00+",
+        "PlayResX: 1080",
+        "PlayResY: 1920",
+        "WrapStyle: 2",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+        "Style: DotRow,Arial,62,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1",
+        "Style: AraText,Amiri,64,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,120,60,0,1",
+        "Style: HinText,Yatra One,56,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,120,60,0,1",
+        "Style: EngText,Playfair Display,52,&H00FFFFFF&,&H000000FF&,&H00000000&,&H88000000,-1,0,0,0,100,100,0,0,1,3,2,5,120,60,0,1",
+        "Style: GradBar,Arial,28,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
+
+    t_start = 4.0
+    t_end = max(float(duration or 20.0) - 4.2, t_start + 3.0)
+    step_dur = (t_end - t_start) / steps
+
+    rows_config = [
+        ("ara", 820, 882, 420, "AraText", 0),
+        ("hin", 1010, 1072, 450, "HinText", 2),
+        ("eng", 1200, 1262, 470, "EngText", 4),
+    ]
+
+    lines = []
+    for i in range(steps):
+        s = t_start + i * step_dur
+        e = s + step_dur
+        ts_s = _fmt_ts(s)
+        ts_e = _fmt_ts(e)
+
+        vals = {
+            "ara": ara_parts[i % len(ara_parts)] if ara_parts else "",
+            "hin": hin_parts[i % len(hin_parts)] if hin_parts else "",
+            "eng": eng_parts[i % len(eng_parts)] if eng_parts else "",
+        }
+
+        for r_idx, (key, text_y, bar_y, text_x, style_name, lang_off) in enumerate(rows_config):
+            val = vals[key]
+            if not val:
+                continue
+
+            dot_col = DOT_PALETTE[(i * 2 + r_idx) % len(DOT_PALETTE)]
+            lines.append(
+                f"Dialogue: 1,{ts_s},{ts_e},DotRow,,,0,0,,"
+                f"{{\\\\pos(115,{text_y})\\\\1c{dot_col}\\\\3c&H000000&\\\\blur1}}●"
+            )
+            lines.append(
+                f"Dialogue: 2,{ts_s},{ts_e},{style_name},,,0,0,,"
+                f"{{\\\\pos({text_x},{text_y})\\\\3c&H000000&\\\\blur1}}{_colorize_words(val, i, lang_off)}"
+            )
+            for sx, sy, b_col, draw_cmd in _build_gradient_bar(i, r_idx, x_start=165, x_end=925, y_pos=bar_y):
+                lines.append(
+                    f"Dialogue: 0,{ts_s},{ts_e},GradBar,,,0,0,,"
+                    f"{{\\\\pos({sx},{sy})\\\\1c{b_col}\\\\bord0\\\\shad0\\\\blur2\\\\p1}}{draw_cmd}{{\\\\p0}}"
+                )
+
+    out_dir = os.path.dirname(output_path) or "temp"
+    os.makedirs(out_dir, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("\\n".join(header + lines) + "\\n")
+    return output_path
+
+
+def create_intro_subtitle(intro_text, duration=3.5, output_path="temp/intro_sub.ass"):
+    return None
+
+
+def create_outro_subtitle(outro_text, total_duration, outro_duration=3.5, output_path="temp/outro_sub.ass"):
+    return None
+'''
+          ass_path.write_text(code, encoding="utf-8")
+          print("✅ Updated Story/ass_builder.py")
           PYEOF
 
-      - name: 5. 💾 Save & Push Fixed Code to Development Repo
+      - name: 5. 💾 Save to Development Repo
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git status --short
           git add -A
           if git diff --cached --quiet; then
-            echo "ℹ️ Code already up-to-date."
+            echo "ℹ️ No changes to commit."
           else
-            git commit -m "fix: add fawaz.py and update all module/asset paths for root layout"
+            git commit -m "style: add 3-language colorful subtitles with dots and gradient bars"
             git push
           fi
 
-      - name: 6. 🎬 Run Story Pipeline Now
+      - name: 6. 🎬 Run Story Pipeline
         working-directory: Story
         env:
           PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/Sources:${{ github.workspace }}/Sources/Fallback:${{ github.workspace }}/Sources/Intro:${{ github.workspace }}/Sources/Outro:${{ github.workspace }}/Sources/CTA:${{ github.workspace }}/Assets_Config:${{ github.workspace }}/Story:${{ github.workspace }}/Story/Uploader"
