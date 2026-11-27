@@ -74,16 +74,19 @@ jobs:
 
       - name: 5. 🔍 Verify Structure
         run: |
-          echo "📂 Story subfolders:"
+          echo "📂 Story files:"
           find Story -maxdepth 2 -type f | sort
           echo ""
-          echo "📂 Assets:"
-          ls -la Assets/
+          echo "📂 Sources files:"
+          find Sources -maxdepth 2 -type f | sort
+          echo ""
+          echo "📂 Assets_Config:"
+          ls -la Assets_Config/
 
       - name: 6. 🎬 Run Story Pipeline
-        working-directory: Story/Pipeline_Orchestration
+        working-directory: Story
         env:
-          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/API/AI_Models:${{ github.workspace }}/API/Video_Sources:${{ github.workspace }}/API/Music_Sources:${{ github.workspace }}/API/Photo_Sources:${{ github.workspace }}/API/Islamic_Content:${{ github.workspace }}/API/Audio_Text:${{ github.workspace }}/URL/Media:${{ github.workspace }}/URL/Islamic:${{ github.workspace }}/URL/TTS_Translation:${{ github.workspace }}/URL/Text_Content:${{ github.workspace }}/Story/Pipeline_Orchestration:${{ github.workspace }}/Story/Final_Render:${{ github.workspace }}/Story/Subtitles_Text:${{ github.workspace }}/Story/Thumbnails:${{ github.workspace }}/Uploader:${{ github.workspace }}/Config/App_Configs"
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/Sources:${{ github.workspace }}/Sources/Fallback:${{ github.workspace }}/Sources/Intro:${{ github.workspace }}/Sources/Outro:${{ github.workspace }}/Sources/CTA:${{ github.workspace }}/Assets_Config:${{ github.workspace }}/Story:${{ github.workspace }}/Story/Uploader"
         run: |
           echo "🚀 Starting Story Pipeline..."
           python -u composer.py
@@ -91,15 +94,15 @@ jobs:
       - name: 7. 📤 Check Output
         if: always()
         run: |
-          VIDEO="Story/Pipeline_Orchestration/temp/Final_Story.mp4"
+          VIDEO="Story/temp/Final_Story.mp4"
           if [ -f "$VIDEO" ]; then
             echo "✅ VIDEO BANA!"
             du -h "$VIDEO"
           else
             echo "ℹ️ Pipeline completed (temp/ may already be cleaned up after Drive upload)."
-            ls -la Story/Pipeline_Orchestration/ 2>/dev/null || true
+            ls -la Story/ 2>/dev/null || true
           fi
 
       - name: 8. 🧹 Cleanup
         if: always()
-        run: rm -rf Story/Pipeline_Orchestration/temp Story/temp temp 2>/dev/null || true
+        run: rm -rf Story/temp temp 2>/dev/null || true
