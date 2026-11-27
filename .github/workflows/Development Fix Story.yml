@@ -1,10 +1,15 @@
-name: 🗑️ Delete Old Folders from Development Repo
+name: 🗑️ Delete One Folder from Development Repo
 
 on:
   workflow_dispatch:
+    inputs:
+      folder_name:
+        description: "Development repo se kaunsa 1 folder delete karna hai (e.g. API, Assets, Config, Story, URL, Uploader)"
+        required: true
+        type: string
 
 jobs:
-  cleanup_old_folders:
+  delete_one_folder:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -14,29 +19,35 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: 🗑️ Remove Old Folders
+      - name: 🗑️ Delete Target Folder
+        env:
+          FOLDER_NAME: ${{ inputs.folder_name }}
         run: |
           python3 - <<'PYEOF'
+          import os
           import shutil
           from pathlib import Path
 
           ROOT = Path(".").resolve()
-          old_folders = ["API", "Assets", "Config", "Story", "URL", "Uploader"]
+          target = os.environ.get("FOLDER_NAME", "").strip().strip("/")
 
-          for folder in old_folders:
-              p = ROOT / folder
-              if p.exists() and p.is_dir():
-                  shutil.rmtree(p)
-                  print(f"Deleted: {folder}/")
-              else:
-                  print(f"Not found (already clean): {folder}/")
+          if not target or target == "Deployment":
+              raise ValueError("Invalid or protected folder name.")
+
+          p = ROOT / target
+          if p.exists() and p.is_dir():
+              shutil.rmtree(p)
+              print(f"✅ Deleted folder: {target}/")
+          else:
+              print(f"⚠️ Folder not found: {target}/")
           PYEOF
 
-      - name: 💾 Commit & Push Deletions
+      - name: 💾 Commit & Push to Development
+        env:
+          FOLDER_NAME: ${{ inputs.folder_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git status --short
           git add -A
-          git commit -m "chore: remove old folders after migrating to Deployment/" || echo "Nothing to commit"
+          git commit -m "chore: delete folder ${{ inputs.folder_name }}" || echo "Nothing to commit"
           git push
