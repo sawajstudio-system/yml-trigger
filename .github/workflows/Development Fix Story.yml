@@ -1,695 +1,169 @@
-name: Development Fix Story
+name: 🔄 One-Time Migrate to Deployment Structure
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-
-concurrency:
-  group: sawaj-single-yml-story
-  cancel-in-progress: false
+  contents: write
 
 jobs:
-  build_story:
+  migrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-
-    env:
-      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-
-      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
-      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
-      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
-      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
-
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
-
-      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
-      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-
     steps:
-      - name: 1. Setup Python & System Tools
-        uses: actions/setup-python@v5
+      - name: 📥 Checkout Repo
+        uses: actions/checkout@v4
         with:
-          python-version: "3.11"
-          cache: "pip"
+          fetch-depth: 0
 
-      - name: 2. Install FFmpeg, Fonts & Python Packages
+      - name: 🏗️ Create Deployment Structure & Migrate Files
         run: |
-          set -Eeuo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
-          sudo fc-cache -f -v
-          python -m pip install --upgrade pip
-          pip install requests edge-tts google-api-python-client google-auth-httplib2 google-auth-oauthlib Pillow mutagen numpy
-
-      - name: 3. Create Single-YML Folder Structure & Python Code
-        shell: bash
-        run: |
-          set -Eeuo pipefail
           python3 - <<'PYEOF'
+          import os
+          import re
+          import shutil
           from pathlib import Path
 
+          ROOT = Path(".").resolve()
+          DEPLOY = ROOT / "Deployment"
+
+          # 1. Create target directories
           dirs = [
-              "Story/Pipeline_Orchestration",
-              "Story/Subtitles_Text",
-              "Story/Final_Render",
-              "Assets",
-              "temp",
+              DEPLOY / "Sources" / "Fallback",
+              DEPLOY / "Sources" / "Intro",
+              DEPLOY / "Sources" / "Outro",
+              DEPLOY / "Sources" / "CTA",
+              DEPLOY / "Assets_Config",
+              DEPLOY / "Story" / "Uploader",
+              DEPLOY / "temp",
           ]
           for d in dirs:
-              Path(d).mkdir(parents=True, exist_ok=True)
+              d.mkdir(parents=True, exist_ok=True)
 
-          # 1. Hadith fetcher (Fawaz API + Hardcoded fallback)
-          Path("Story/Pipeline_Orchestration/hadith_source.py").write_text('''import random
-          import re
-          import requests
+          # 2. Helper to copy file if exists
+          def copy_if_exists(src_rel, dst_rel):
+              s = ROOT / src_rel
+              d = DEPLOY / dst_rel
+              if s.exists() and s.is_file():
+                  d.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(s, d)
+                  return True
+              return False
 
-          BASE_URLS = [
-              "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1",
-              "https://raw.githubusercontent.com/fawazahmed0/hadith-api/1",
-          ]
+          # 3. Root files
+          copy_if_exists(".gitignore", ".gitignore")
+          copy_if_exists("requirements.txt", "requirements.txt")
+          (DEPLOY / "Story" / ".gitkeep").touch()
 
-          BOOKS = [
-              {"eng": "eng-bukhari", "ara": "ara-bukhari", "name": "Sahih al-Bukhari", "hi": "सहीह अल-बुखारी", "author": "इमाम बुखारी", "max": 7563},
-              {"eng": "eng-muslim", "ara": "ara-muslim", "name": "Sahih Muslim", "hi": "सहीह मुस्लिम", "author": "इमाम मुस्लिम", "max": 7450},
-              {"eng": "eng-abudawud", "ara": "ara-abudawud", "name": "Sunan Abu Dawud", "hi": "सुनन अबू दाऊद", "author": "इमाम अबू दाऊद", "max": 5274},
-              {"eng": "eng-tirmidhi", "ara": "ara-tirmidhi", "name": "Jami at-Tirmidhi", "hi": "जामिअ अत-तिर्मिज़ी", "author": "इमाम तिर्मिज़ी", "max": 3956},
-              {"eng": "eng-nasai", "ara": "ara-nasai", "name": "Sunan an-Nasa'i", "hi": "सुनन अन-नसाई", "author": "इमाम नसाई", "max": 5758},
-              {"eng": "eng-ibnmajah", "ara": "ara-ibnmajah", "name": "Sunan Ibn Majah", "hi": "सुनन इब्ने माजा", "author": "इमाम इब्ने माजा", "max": 4341},
-          ]
+          # 4. Sources files
+          source_map = {
+              "API/AI_Models/anges.py": "Sources/anges.py",
+              "API/AI_Models/cloudflare.py": "Sources/cloudflare.py",
+              "API/AI_Models/cohere.py": "Sources/cohere.py",
+              "API/AI_Models/gemini.py": "Sources/gemini.py",
+              "API/AI_Models/groq.py": "Sources/groq.py",
+              "API/AI_Models/nvidia.py": "Sources/nvidia.py",
+              "API/AI_Models/openrouter.py": "Sources/openrouter.py",
+              "API/Audio_Text/elevenlabs.py": "Sources/elevenlabs.py",
+              "API/Music_Sources/freesound.py": "Sources/freesound.py",
+              "API/Music_Sources/pixabay_music.py": "Sources/pixabay_music.py",
+              "API/Video_Sources/coverr.py": "Sources/coverr.py",
+              "API/Video_Sources/gradient.py": "Sources/gradient.py",
+              "API/Video_Sources/pexels_video.py": "Sources/pexels_video.py",
+              "API/Video_Sources/pixabay_video.py": "Sources/pixabay_video.py",
+              "URL/Islamic/hijri_date.py": "Sources/hijri_date.py",
+              "URL/TTS_Translation/edge_tts.py": "Sources/edge_tts.py",
+              "URL/TTS_Translation/mymemory.py": "Sources/mymemory.py",
+              # Fallback
+              "API/AI_Models/ai_fallback.py": "Sources/Fallback/all_ai_fallback.py",
+              "URL/TTS_Translation/audio_text_url_fallback.py": "Sources/Fallback/all_audio_text_url_fallback.py",
+              "API/Islamic_Content/islamic_fallback.py": "Sources/Fallback/all_islamic_fallback.py",
+              "URL/Islamic/islamic_url_fallback.py": "Sources/Fallback/all_islamic_url_fallback.py",
+              "API/Music_Sources/music_fallback.py": "Sources/Fallback/all_music_fallback.py",
+              "API/Audio_Text/translate_fallback.py": "Sources/Fallback/all_translate_fallback.py",
+              "API/Video_Sources/video_fallback.py": "Sources/Fallback/all_video_fallback.py",
+              "API/Audio_Text/voice_fallback.py": "Sources/Fallback/all_voice_fallback.py",
+              # Intro / Outro / CTA
+              "API/Audio_Text/intro_AI.py": "Sources/Intro/intro_AI.py",
+              "Config/Template_Settings/intro_1.json": "Sources/Intro/intro_1.json",
+              "Story/Video/procedural_intro.py": "Sources/Intro/procedural_intro.py",
+              "API/Audio_Text/outro_AI.py": "Sources/Outro/outro_AI.py",
+              "Config/Template_Settings/outro_1.json": "Sources/Outro/outro_1.json",
+              "API/Audio_Text/cta_AI.py": "Sources/CTA/cta_AI.py",
+              "Config/Template_Settings/cta_default.json": "Sources/CTA/cta_default.json",
+              "Story/Thumbnails/cta_maker.py": "Sources/CTA/cta_maker.py",
+              # Story & Uploader
+              "Story/Subtitles_Text/ass_builder.py": "Story/ass_builder.py",
+              "Story/Pipeline_Orchestration/composer.py": "Story/composer.py",
+              "Story/Pipeline_Orchestration/duration.py": "Story/duration.py",
+              "Story/Video/fetch_background.py": "Story/fetch_background.py",
+              "Story/Final_Render/ffmpeg_render.py": "Story/ffmpeg_render.py",
+              "Story/Video/ffmpeg_utils.py": "Story/ffmpeg_utils.py",
+              "Story/Audio/generate_voice.py": "Story/generate_voice.py",
+              "Story/Content/get_hadith.py": "Story/get_hadith.py",
+              "Story/Final_Render/render_video.py": "Story/render_video.py",
+              "Story/Content/translator.py": "Story/translator.py",
+              "Story/Upload/final_upload.py": "Story/Uploader/final_upload.py",
+              "Uploader/story_upload.py": "Story/Uploader/story_upload.py",
+          }
+          for s, d in source_map.items():
+              copy_if_exists(s, d)
 
-          def _sanitize(text):
-              if not text:
-                  return ""
-              text = re.sub(r"[\\u200b-\\u200f\\ufeff\\u202a-\\u202e]", "", str(text))
-              text = text.replace("\\n", " ").replace("\\r", " ")
-              return re.sub(r"\\s+", " ", text).strip()
+          # 5. Assets + Config -> Assets_Config
+          assets_dir = ROOT / "Assets"
+          if assets_dir.exists():
+              for f in assets_dir.iterdir():
+                  if f.is_file() and f.name != "__init__.py":
+                      shutil.copy2(f, DEPLOY / "Assets_Config" / f.name)
 
-          def fetch_hadith():
-              book = random.choice(BOOKS)
-              for _ in range(5):
-                  num = random.randint(1, book["max"])
-                  for base in BASE_URLS:
-                      try:
-                          r_eng = requests.get(f"{base}/editions/{book['eng']}/{num}.json", timeout=15)
-                          if r_eng.status_code != 200:
-                              continue
-                          eng_list = r_eng.json().get("hadiths", [])
-                          if not eng_list:
-                              continue
-                          eng_text = _sanitize(eng_list[0].get("text", ""))
-                          if len(eng_text) < 25:
-                              continue
-                          ara_text = ""
-                          r_ara = requests.get(f"{base}/editions/{book['ara']}/{num}.json", timeout=10)
-                          if r_ara.status_code == 200:
-                              ara_list = r_ara.json().get("hadiths", [])
-                              if ara_list:
-                                  ara_text = _sanitize(ara_list[0].get("text", ""))
-                          if ara_text:
-                              return {
-                                  "collection": book["name"],
-                                  "book_hi": book["hi"],
-                                  "author_hi": book["author"],
-                                  "number": str(eng_list[0].get("hadithnumber") or num),
-                                  "english": eng_text,
-                                  "arabic": ara_text,
-                              }
-                      except Exception:
-                          continue
-              fallbacks = [
-                  {
-                      "collection": "Sahih al-Bukhari",
-                      "book_hi": "सहीह अल-बुखारी",
-                      "author_hi": "इमाम बुखारी",
-                      "number": "1",
-                      "english": "Actions are judged by intentions and every person will get what he intended.",
-                      "arabic": "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",
-                  },
-                  {
-                      "collection": "Sahih al-Bukhari",
-                      "book_hi": "सहीह अल-बुखारी",
-                      "author_hi": "इमाम बुखारी",
-                      "number": "13",
-                      "english": "None of you truly believes until he loves for his brother what he loves for himself.",
-                      "arabic": "لاَ يُؤْمِنُ أَحَدُكُمْ حَتَّى يُحِبَّ لأَخِيهِ",
-                  },
-              ]
-              return random.choice(fallbacks)
-          ''', encoding="utf-8")
+          config_keep = {
+              "Config/App_Configs/app_config.json",
+              "Config/Language_Settings/ar_font_settings.json",
+              "Config/Language_Settings/ar_strings.json",
+              "Config/Style_Settings/arabic_style.json",
+              "Config/App_Configs/colors.json",
+              "Config/App_Configs/default_template.json",
+              "Config/Language_Settings/en_font_settings.json",
+              "Config/Language_Settings/en_strings.json",
+              "Config/Style_Settings/english_style.json",
+              "Config/Language_Settings/hi_font_settings.json",
+              "Config/Language_Settings/hi_strings.json",
+              "Config/Style_Settings/hindi_style.json",
+              "Config/App_Configs/palette.py",
+              "Config/Template_Settings/thumb_style_1.json",
+              "Config/Template_Settings/thumb_style_2.json",
+              "Config/App_Configs/video_settings.json",
+          }
+          for cfg in config_keep:
+              fname = Path(cfg).name
+              copy_if_exists(cfg, f"Assets_Config/{fname}")
 
-          # 2. AI + MyMemory Hindi translation
-          Path("Story/Pipeline_Orchestration/hindi_text_gen.py").write_text('''import os
-          import re
-          import requests
+          # 6. Update fallback module names & Assets_Config paths inside copied .py files
+          replacements = {
+              "ai_fallback": "all_ai_fallback",
+              "audio_text_url_fallback": "all_audio_text_url_fallback",
+              "islamic_fallback": "all_islamic_fallback",
+              "islamic_url_fallback": "all_islamic_url_fallback",
+              "music_fallback": "all_music_fallback",
+              "translate_fallback": "all_translate_fallback",
+              "video_fallback": "all_video_fallback",
+              "voice_fallback": "all_voice_fallback",
+              '"Assets"': '"Assets_Config"',
+              "'Assets'": "'Assets_Config'",
+              '/ "Assets"': '/ "Assets_Config"',
+          }
+          for py_file in DEPLOY.rglob("*.py"):
+              txt = py_file.read_text(encoding="utf-8", errors="ignore")
+              for old, new in replacements.items():
+                  txt = txt.replace(old, new)
+              py_file.write_text(txt, encoding="utf-8")
 
-          def _call_gemini(prompt, max_tokens=250):
-              key = os.getenv("GEMINI_API_KEY")
-              if not key:
-                  return None
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
-              payload = {
-                  "contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8},
-              }
-              r = requests.post(url, json=payload, timeout=30)
-              if r.status_code == 200:
-                  return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-              return None
-
-          def _call_groq(prompt, max_tokens=250):
-              key = os.getenv("GROQ_API_KEY")
-              if not key:
-                  return None
-              url = "https://api.groq.com/openai/v1/chat/completions"
-              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-              payload = {
-                  "model": "llama-3.3-70b-versatile",
-                  "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": max_tokens,
-                  "temperature": 0.8,
-              }
-              r = requests.post(url, headers=headers, json=payload, timeout=30)
-              if r.status_code == 200:
-                  return r.json()["choices"][0]["message"]["content"].strip()
-              return None
-
-          def _call_openrouter(prompt, max_tokens=250):
-              key = os.getenv("OPENROUTER_API_KEY")
-              if not key:
-                  return None
-              url = "https://openrouter.ai/api/v1/chat/completions"
-              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-              payload = {
-                  "model": "openai/gpt-4o-mini",
-                  "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": max_tokens,
-                  "temperature": 0.8,
-              }
-              r = requests.post(url, headers=headers, json=payload, timeout=30)
-              if r.status_code == 200:
-                  return r.json()["choices"][0]["message"]["content"].strip()
-              return None
-
-          def _mymemory_hi(english_text):
-              if not english_text:
-                  return ""
-              parts = []
-              for chunk in re.findall(r".{1,420}(?:\\s+|$)", english_text.strip()):
-                  q = chunk.strip()
-                  if not q:
-                      continue
-                  try:
-                      r = requests.get(
-                          "https://api.mymemory.translated.net/get",
-                          params={"q": q, "langpair": "en|hi"},
-                          timeout=15,
-                      )
-                      if r.status_code == 200:
-                          tr = r.json().get("responseData", {}).get("translatedText", "").strip()
-                          if tr and "MYMEMORY WARNING" not in tr.upper():
-                              parts.append(tr)
-                  except Exception:
-                      continue
-              return " ".join(parts).strip()
-
-          def generate_hindi_script(english_text):
-              prompt = (
-                  "Translate this Hadith to natural Hindi and add a brief 1-line moral lesson in Hindi. "
-                  "Keep total around 50-75 words. Output only Hindi text.\\n\\n"
-                  f"Hadith: {english_text}"
-              )
-              for fn in (_call_gemini, _call_groq, _call_openrouter):
-                  try:
-                      out = fn(prompt, 250)
-                      if out and any("\\u0900" <= ch <= "\\u097F" for ch in out):
-                          return out.strip()
-                  except Exception:
-                      continue
-              fallback = _mymemory_hi(english_text)
-              if fallback and any("\\u0900" <= ch <= "\\u097F" for ch in fallback):
-                  return fallback
-              return "नियत और अच्छे कर्मों से इंसान की पहचान होती है। हमेशा सच्चाई और भलाई के रास्ते पर चलें।"
-          ''', encoding="utf-8")
-
-          # 3. TTS Voice (ElevenLabs + Google TTS fallback)
-          Path("Story/Pipeline_Orchestration/voice_gen.py").write_text('''import os
-          import requests
-
-          def _chunk_words(text, max_chars=140):
-              words = text.split()
-              chunks, cur = [], ""
-              for w in words:
-                  if len(cur) + len(w) + 1 > max_chars:
-                      if cur:
-                          chunks.append(cur)
-                      cur = w
-                  else:
-                      cur = f"{cur} {w}".strip() if cur else w
-              if cur:
-                  chunks.append(cur)
-              return chunks or [text]
-
-          def generate_hindi_voice(text, output_path="temp/voice.mp3"):
-              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
-              eleven_key = os.getenv("ELEVENLABS_API_KEY")
-              if eleven_key:
-                  try:
-                      url = "https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB"
-                      headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": eleven_key}
-                      payload = {
-                          "text": text,
-                          "model_id": "eleven_multilingual_v2",
-                          "voice_settings": {"stability": 0.5, "similarity_boost": 0.85, "speed": 0.88},
-                      }
-                      r = requests.post(url, json=payload, headers=headers, timeout=60)
-                      if r.status_code == 200 and len(r.content) > 1000:
-                          with open(output_path, "wb") as f:
-                              f.write(r.content)
-                          return output_path, "ElevenLabs"
-                  except Exception:
-                      pass
-              try:
-                  audio = b""
-                  headers = {"User-Agent": "Mozilla/5.0"}
-                  for chunk in _chunk_words(text, 140):
-                      r = requests.get(
-                          "https://translate.google.com/translate_tts",
-                          params={"ie": "UTF-8", "q": chunk, "tl": "hi", "client": "tw-ob"},
-                          headers=headers,
-                          timeout=15,
-                      )
-                      if r.status_code == 200:
-                          audio += r.content
-                  if len(audio) > 1000:
-                      with open(output_path, "wb") as f:
-                          f.write(audio)
-                      return output_path, "Google-TTS"
-              except Exception:
-                  pass
-              return None, "None"
-          ''', encoding="utf-8")
-
-          # 4. Media (Pexels / Pixabay / Gradient + Freesound / Pixabay / Sine music)
-          Path("Story/Pipeline_Orchestration/media_gen.py").write_text('''import os
-          import random
-          import subprocess
-          import requests
-
-          QUERIES = [
-              "islamic mosque night",
-              "stars night sky",
-              "ocean waves sunset",
-              "desert sand dunes",
-              "green mountains mist",
-              "lantern light dark",
-          ]
-
-          def _normalize_clip(raw_path, out_path, duration=20.0):
-              cmd = (
-                  f'ffmpeg -y -i "{raw_path}" '
-                  f'-vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24,setsar=1" '
-                  f'-t {duration:.2f} -an -c:v libx264 -preset ultrafast -crf 25 -pix_fmt yuv420p "{out_path}"'
-              )
-              subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=180)
-              return os.path.exists(out_path) and os.path.getsize(out_path) > 10000
-
-          def _gradient_clip(out_path, duration=20.0):
-              c0 = f"{random.randint(10,35):02x}{random.randint(12,35):02x}{random.randint(25,55):02x}"
-              c1 = f"{random.randint(5,20):02x}{random.randint(8,22):02x}{random.randint(15,35):02x}"
-              cmd = (
-                  f'ffmpeg -y -f lavfi -i "gradients=s=1080x1920:c0=0x{c0}:c1=0x{c1}:speed=0.005" '
-                  f'-t {duration:.2f} -c:v libx264 -preset ultrafast -crf 24 -pix_fmt yuv420p "{out_path}"'
-              )
-              subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=180)
-              return os.path.exists(out_path)
-
-          def build_background_video(duration=30.0, output_path="temp/bg_video.mp4"):
-              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
-              pexels_key = os.getenv("PEXELS_API_KEY")
-              pixabay_key = os.getenv("PIXABAY_API_KEY")
-              clip_dur = max(12.0, round(duration / 2.0, 2))
-              chosen = random.sample(QUERIES, 2)
-              clips = []
-
-              for idx, q in enumerate(chosen):
-                  raw = f"temp/raw_{idx}.mp4"
-                  norm = f"temp/norm_{idx}.mp4"
-                  downloaded = False
-                  if pexels_key:
-                      try:
-                          r = requests.get(
-                              "https://api.pexels.com/videos/search",
-                              params={"query": q, "orientation": "portrait", "per_page": 5},
-                              headers={"Authorization": pexels_key},
-                              timeout=15,
-                          )
-                          if r.status_code == 200 and r.json().get("videos"):
-                              vfiles = r.json()["videos"][0].get("video_files", [])
-                              best = next((v for v in vfiles if 720 <= v.get("width", 0) <= 1080), vfiles[0] if vfiles else None)
-                              if best and best.get("link"):
-                                  with open(raw, "wb") as f:
-                                      f.write(requests.get(best["link"], timeout=30).content)
-                                  downloaded = os.path.exists(raw) and os.path.getsize(raw) > 10000
-                      except Exception:
-                          pass
-                  if not downloaded and pixabay_key:
-                      try:
-                          r = requests.get(
-                              "https://pixabay.com/api/videos/",
-                              params={"key": pixabay_key, "q": q, "orientation": "vertical", "per_page": 5},
-                              timeout=15,
-                          )
-                          if r.status_code == 200 and r.json().get("hits"):
-                              vurl = r.json()["hits"][0].get("videos", {}).get("large", {}).get("url")
-                              if vurl:
-                                  with open(raw, "wb") as f:
-                                      f.write(requests.get(vurl, timeout=30).content)
-                                  downloaded = os.path.exists(raw) and os.path.getsize(raw) > 10000
-                      except Exception:
-                          pass
-                  try:
-                      if downloaded and _normalize_clip(raw, norm, clip_dur):
-                          clips.append(norm)
-                      elif _gradient_clip(norm, clip_dur):
-                          clips.append(norm)
-                  except Exception:
-                      pass
-
-              if not clips:
-                  _gradient_clip(output_path, duration)
-                  return output_path
-
-              list_file = "temp/bg_list.txt"
-              with open(list_file, "w", encoding="utf-8") as f:
-                  for c in clips:
-                      f.write(f"file '{os.path.abspath(c)}'\\n")
-              subprocess.run(
-                  f'ffmpeg -y -f concat -safe 0 -i "{list_file}" -t {duration:.2f} -c:v libx264 -preset ultrafast -crf 24 -pix_fmt yuv420p "{output_path}"',
-                  shell=True,
-                  check=True,
-                  capture_output=True,
-                  timeout=180,
-              )
-              return output_path
-
-          def build_music(duration=30.0, output_path="temp/music.mp3"):
-              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
-              fade_out = max(1.0, duration - 3.0)
-              cmd = (
-                  f'ffmpeg -y -f lavfi -i "sine=frequency=110:duration={duration:.2f}" '
-                  f'-af "afade=t=in:st=0:d=2,afade=t=out:st={fade_out:.2f}:d=3,volume=0.10" '
-                  f'-c:a libmp3lame -b:a 128k "{output_path}"'
-              )
-              try:
-                  subprocess.run(cmd, shell=True, check=True, capture_output=True, timeout=60)
-                  return output_path
-              except Exception:
-                  return ""
-          ''', encoding="utf-8")
-
-          # 5. Subtitles (3 languages, 2-3 words per chunk, dot + rotating multi-word bright colors)
-          Path("Story/Subtitles_Text/ass_builder.py").write_text('''import os
-          import re
-
-          DOT_PALETTE = [
-              "&H002890FF&",  # Bright Orange
-              "&H00FFCC33&",  # Bright Sky Cyan
-              "&H0018B8FF&",  # Golden Amber
-              "&H0066FF88&",  # Bright Green
-              "&H00FF66EE&",  # Bright Pink/Magenta
-          ]
-
-          WORD_PALETTE = [
-              "&H00FFCC33&",  # Sky Blue
-              "&H0077FF88&",  # Mint Green
-              "&H001CE8FF&",  # Bright Yellow
-              "&H00FF66EE&",  # Pink Magenta
-              "&H003890FF&",  # Warm Orange
-              "&H00FFFF55&",  # Cyan Aqua
-          ]
-
-          def _fmt_ts(sec):
-              sec = max(0.0, float(sec))
-              h = int(sec // 3600)
-              m = int((sec % 3600) // 60)
-              s = int(sec % 60)
-              cs = min(99, int(round((sec - int(sec)) * 100)))
-              return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
-
-          def _split_2_to_3_words(text):
-              words = [w.strip() for w in str(text or "").split() if w.strip()]
-              if not words:
-                  return []
-              chunks = []
-              i = 0
-              n = len(words)
-              while i < n:
-                  rem = n - i
-                  if rem <= 3:
-                      step = rem
-                  elif rem == 4:
-                      step = 2
-                  else:
-                      step = 3
-                  chunks.append(" ".join(words[i:i + step]))
-                  i += step
-              return chunks
-
-          def _colorize(chunk, step_idx, offset=0):
-              words = [w for w in str(chunk or "").split() if w]
-              out = []
-              for idx, w in enumerate(words):
-                  col = WORD_PALETTE[(step_idx * 2 + offset + idx) % len(WORD_PALETTE)]
-                  out.append(f"{{\\1c{col}}}{w}")
-              return " ".join(out)
-
-          def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_subtitles.ass"):
-              h = hadith if isinstance(hadith, dict) else {}
-              ara_src = re.sub(r'[\\"\\n\\r]', " ", str(h.get("arabic", ""))).strip()
-              hin_src = re.sub(r'[\\"\\n\\r]', " ", str(hindi_text or "")).strip()
-              eng_src = re.sub(r'[\\"\\n\\r]', " ", str(h.get("english", ""))).strip()
-
-              ara_parts = _split_2_to_3_words(ara_src)
-              hin_parts = _split_2_to_3_words(hin_src)
-              eng_parts = _split_2_to_3_words(eng_src)
-              steps = max(len(ara_parts), len(hin_parts), len(eng_parts), 1)
-
-              header = [
-                  "[Script Info]",
-                  "ScriptType: v4.00+",
-                  "PlayResX: 1080",
-                  "PlayResY: 1920",
-                  "WrapStyle: 2",
-                  "",
-                  "[V4+ Styles]",
-                  "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-                  "Style: DotAra,Arial,64,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1",
-                  "Style: AraText,Noto Sans Arabic,68,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,2,5,120,60,0,1",
-                  "Style: DotHin,Arial,64,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1",
-                  "Style: HinText,Noto Sans Devanagari,60,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,2,5,120,60,0,1",
-                  "Style: DotEng,Arial,64,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1",
-                  "Style: EngText,Noto Sans,56,&H00FFFFFF&,&H000000FF&,&H00000000&,&H99000000,-1,0,0,0,100,100,0,0,1,4,2,5,120,60,0,1",
-                  "",
-                  "[Events]",
-                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-              ]
-
-              t_start = 0.5
-              t_end = max(float(duration or 20.0) - 0.5, t_start + 3.0)
-              step_dur = (t_end - t_start) / steps
-
-              lines = []
-              for i in range(steps):
-                  s = t_start + i * step_dur
-                  e = s + step_dur
-                  a_val = ara_parts[i % len(ara_parts)] if ara_parts else ""
-                  h_val = hin_parts[i % len(hin_parts)] if hin_parts else ""
-                  e_val = eng_parts[i % len(eng_parts)] if eng_parts else ""
-
-                  da = DOT_PALETTE[i % len(DOT_PALETTE)]
-                  dh = DOT_PALETTE[(i + 1) % len(DOT_PALETTE)]
-                  de = DOT_PALETTE[(i + 2) % len(DOT_PALETTE)]
-
-                  if a_val:
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotAra,,,0,0,,{{\\pos(110,820)\\1c{da}\\3c&H000000&}}●")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},AraText,,,0,0,,{{\\pos(420,820)\\3c&H000000&}}{_colorize(a_val, i, 0)}")
-                  if h_val:
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotHin,,,0,0,,{{\\pos(110,1020)\\1c{dh}\\3c&H000000&}}●")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},HinText,,,0,0,,{{\\pos(440,1020)\\3c&H000000&}}{_colorize(h_val, i, 2)}")
-                  if e_val:
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},DotEng,,,0,0,,{{\\pos(110,1220)\\1c{de}\\3c&H000000&}}●")
-                      lines.append(f"Dialogue: 1,{_fmt_ts(s)},{_fmt_ts(e)},EngText,,,0,0,,{{\\pos(460,1220)\\3c&H000000&}}{_colorize(e_val, i, 4)}")
-
-              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
-              with open(output_path, "w", encoding="utf-8") as f:
-                  f.write("\\n".join(header + lines) + "\\n")
-              return output_path
-          ''', encoding="utf-8")
-
-          # 6. Renderer + Drive uploader + Main pipeline
-          Path("Story/Final_Render/renderer.py").write_text('''import os
-          import subprocess
-
-          def _esc(p):
-              return (
-                  p.replace("\\\\", "\\\\\\\\")
-                  .replace(":", "\\\\:")
-                  .replace("'", "\\\\'")
-                  .replace("[", "\\\\[")
-                  .replace("]", "\\\\]")
-              )
-
-          def render_video(bg_video, music_path, voice_path, ass_path, duration, output_path="temp/Final_Story.mp4"):
-              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
-              cmd = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video, "-i", voice_path]
-              has_music = bool(music_path and os.path.exists(music_path) and os.path.getsize(music_path) > 0)
-              if has_music:
-                  cmd += ["-i", music_path]
-
-              v = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=brightness=0.01:contrast=1.08:saturation=1.12[bg];"
-              v += f"[bg]subtitles=filename=\\'{_esc(os.path.abspath(ass_path))}\\'[v_out]"
-
-              if has_music:
-                  a = (
-                      "[2:a]volume=0.14[bgm];"
-                      "[bgm][1:a]sidechaincompress=threshold=0.05:ratio=8:attack=50:release=500[ducked];"
-                      "[1:a][ducked]amix=inputs=2:duration=first[a_out]"
-                  )
-              else:
-                  a = "[1:a]volume=1.0[a_out]"
-
-              cmd += [
-                  "-filter_complex", f"{v}; {a}",
-                  "-map", "[v_out]", "-map", "[a_out]",
-                  "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24",
-                  "-r", "24", "-c:a", "aac", "-b:a", "128k",
-                  "-t", f"{float(duration):.2f}", output_path,
-              ]
-              res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-              if res.returncode != 0:
-                  print(res.stderr[-2000:])
-                  return None
-              return output_path
-          ''', encoding="utf-8")
-
-          Path("Story/Pipeline_Orchestration/run_story.py").write_text('''import os
-          import subprocess
-          import time
-          import requests
-          from mutagen.mp3 import MP3
-          from google.oauth2.credentials import Credentials
-          from googleapiclient.discovery import build
-          from googleapiclient.http import MediaFileUpload
-
-          from hadith_source import fetch_hadith
-          from hindi_text_gen import generate_hindi_script
-          from voice_gen import generate_hindi_voice
-          from media_gen import build_background_video, build_music
-          from ass_builder import create_main_subtitles
-          from renderer import render_video
-
-          def notify(msg):
-              tok = os.getenv("TELEGRAM_API_REPORT_TOKEN")
-              chat = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
-              if tok and chat:
-                  try:
-                      requests.post(
-                          f"https://api.telegram.org/bot{tok}/sendMessage",
-                          json={"chat_id": chat, "text": msg[:4000], "parse_mode": "HTML"},
-                          timeout=10,
-                      )
-                  except Exception:
-                      pass
-
-          def upload_drive(path):
-              cid = os.getenv("GDRIVE_CLIENT_ID")
-              csec = os.getenv("GDRIVE_CLIENT_SECRET")
-              rtok = os.getenv("GDRIVE_REFRESH_TOKEN")
-              fid = os.getenv("GDRIVE_F_STORY_ID")
-              if not all([cid, csec, rtok]):
-                  return None
-              creds = Credentials(None, refresh_token=rtok, client_id=cid, client_secret=csec, token_uri="https://oauth2.googleapis.com/token")
-              svc = build("drive", "v3", credentials=creds, cache_discovery=False)
-              meta = {"name": f"Story_Video_{int(time.time())}.mp4"}
-              if fid:
-                  meta["parents"] = [fid]
-              media = MediaFileUpload(path, mimetype="video/mp4", resumable=True)
-              f = svc.files().create(body=meta, media_body=media, fields="id,webViewLink").execute()
-              try:
-                  svc.permissions().create(fileId=f["id"], body={"type": "anyone", "role": "reader"}).execute()
-              except Exception:
-                  pass
-              return f.get("webViewLink")
-
-          def get_duration(mp3_path):
-              try:
-                  return float(MP3(mp3_path).info.length)
-              except Exception:
-                  return 25.0
-
-          def main():
-              notify("🚀 <b>Single-YML Story Pipeline Started</b>")
-              hadith = fetch_hadith()
-              hindi_text = generate_hindi_script(hadith["english"])
-              narration = f"{hadith['book_hi']} की हदीस नंबर {hadith['number']}। {hindi_text}"
-
-              voice_raw, voice_engine = generate_hindi_voice(narration, "temp/voice_raw.mp3")
-              if not voice_raw:
-                  notify("❌ Voice generation failed.")
-                  return
-
-              voice_path = "temp/voice.mp3"
-              subprocess.run(
-                  f'ffmpeg -y -i "{voice_raw}" -filter:a "atempo=0.88" -vn "{voice_path}"',
-                  shell=True, capture_output=True, timeout=60,
-              )
-              if not os.path.exists(voice_path):
-                  voice_path = voice_raw
-
-              dur = max(12.0, get_duration(voice_path) + 1.0)
-              bg = build_background_video(dur, "temp/bg_video.mp4")
-              music = build_music(dur, "temp/music.mp3")
-              ass_path = create_main_subtitles(hadith, hindi_text, dur, "temp/main_subtitles.ass")
-              out_mp4 = render_video(bg, music, voice_path, ass_path, dur, "temp/Final_Story.mp4")
-
-              if not out_mp4 or not os.path.exists(out_mp4):
-                  notify("❌ Video rendering failed.")
-                  return
-
-              link = upload_drive(out_mp4)
-              msg = (
-                  f"✅ <b>Story Ready!</b>\\n"
-                  f"📖 <b>Book:</b> {hadith['book_hi']} (#{hadith['number']})\\n"
-                  f"🎙️ <b>Voice:</b> {voice_engine}"
-              )
-              if link:
-                  msg += f"\\n📥 <a href='{link}'>Open Video</a>"
-              notify(msg)
-              print("✅ DONE:", out_mp4)
-
-          if __name__ == "__main__":
-              main()
-          ''', encoding="utf-8")
-
-          print("✅ Single-YML structure and code created.")
+          print("✅ Migration completed into Deployment/")
           PYEOF
 
-      - name: 4. Run Complete Story Pipeline
-        env:
-          PYTHONPATH: "Story/Pipeline_Orchestration:Story/Subtitles_Text:Story/Final_Render"
+      - name: 💾 Commit & Push Deployment Folder
         run: |
-          set -Eeuo pipefail
-          python -u Story/Pipeline_Orchestration/run_story.py
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Deployment/
+          git commit -m "chore: migrate project structure to Deployment/" || echo "Nothing to commit"
+          git push
