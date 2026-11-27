@@ -1,10 +1,10 @@
-name: ♻️ Restore Development to Commit 93d66a7
+name: 🏗️ Build New Deployment/ & Remove Old Folders (One-Time)
 
 on:
   workflow_dispatch:
 
 jobs:
-  restore_commit:
+  migrate_clean:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -14,10 +14,175 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: ♻️ Checkout Full Tree from 93d66a7
+      - name: ♻️ Ensure Base Code Is Restored from 93d66a7
         run: |
           set -e
           git checkout 93d66a7 -- .
+
+      - name: 🏗️ Build Exact Deployment/ Structure
+        run: |
+          python3 - <<'PYEOF'
+          import shutil
+          from pathlib import Path
+
+          ROOT = Path(".").resolve()
+          DEPLOY = ROOT / "Deployment"
+
+          if DEPLOY.exists():
+              shutil.rmtree(DEPLOY)
+
+          # Create exact folder layout
+          for d in [
+              DEPLOY / "Sources" / "Fallback",
+              DEPLOY / "Sources" / "Intro",
+              DEPLOY / "Sources" / "Outro",
+              DEPLOY / "Sources" / "CTA",
+              DEPLOY / "Assets_Config",
+              DEPLOY / "Story" / "Uploader",
+          ]:
+              d.mkdir(parents=True, exist_ok=True)
+
+          for init_p in [
+              DEPLOY / "Sources" / "__init__.py",
+              DEPLOY / "Sources" / "Fallback" / "__init__.py",
+              DEPLOY / "Sources" / "Intro" / "__init__.py",
+              DEPLOY / "Sources" / "Outro" / "__init__.py",
+              DEPLOY / "Sources" / "CTA" / "__init__.py",
+              DEPLOY / "Assets_Config" / "__init__.py",
+              DEPLOY / "Story" / "__init__.py",
+              DEPLOY / "Story" / "Uploader" / "__init__.py",
+          ]:
+              init_p.touch()
+
+          (DEPLOY / "Story" / ".gitkeep").touch()
+
+          def cp_file(src_rel, dst_rel):
+              s = ROOT / src_rel
+              d = DEPLOY / dst_rel
+              if s.exists() and s.is_file():
+                  d.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(s, d)
+
+          # Root files inside Deployment/
+          cp_file(".gitignore", ".gitignore")
+          cp_file("requirements.txt", "requirements.txt")
+
+          # Sources/
+          sources_map = {
+              "API/AI_Models/anges.py": "Sources/anges.py",
+              "API/AI_Models/cloudflare.py": "Sources/cloudflare.py",
+              "API/AI_Models/cohere.py": "Sources/cohere.py",
+              "API/AI_Models/gemini.py": "Sources/gemini.py",
+              "API/AI_Models/groq.py": "Sources/groq.py",
+              "API/AI_Models/nvidia.py": "Sources/nvidia.py",
+              "API/AI_Models/openrouter.py": "Sources/openrouter.py",
+              "API/Audio_Text/elevenlabs.py": "Sources/elevenlabs.py",
+              "API/Music_Sources/freesound.py": "Sources/freesound.py",
+              "API/Music_Sources/pixabay_music.py": "Sources/pixabay_music.py",
+              "API/Video_Sources/coverr.py": "Sources/coverr.py",
+              "API/Video_Sources/gradient.py": "Sources/gradient.py",
+              "API/Video_Sources/pexels_video.py": "Sources/pexels_video.py",
+              "API/Video_Sources/pixabay_video.py": "Sources/pixabay_video.py",
+              "URL/Islamic/hijri_date.py": "Sources/hijri_date.py",
+              "URL/TTS_Translation/edge_tts.py": "Sources/edge_tts.py",
+              "URL/TTS_Translation/mymemory.py": "Sources/mymemory.py",
+              # Sources/Fallback/
+              "API/AI_Models/ai_fallback.py": "Sources/Fallback/all_ai_fallback.py",
+              "URL/TTS_Translation/audio_text_url_fallback.py": "Sources/Fallback/all_audio_text_url_fallback.py",
+              "API/Islamic_Content/islamic_fallback.py": "Sources/Fallback/all_islamic_fallback.py",
+              "URL/Islamic/islamic_url_fallback.py": "Sources/Fallback/all_islamic_url_fallback.py",
+              "API/Music_Sources/music_fallback.py": "Sources/Fallback/all_music_fallback.py",
+              "API/Audio_Text/translate_fallback.py": "Sources/Fallback/all_translate_fallback.py",
+              "API/Video_Sources/video_fallback.py": "Sources/Fallback/all_video_fallback.py",
+              "API/Audio_Text/voice_fallback.py": "Sources/Fallback/all_voice_fallback.py",
+              # Sources/Intro/
+              "API/Audio_Text/intro_AI.py": "Sources/Intro/intro_AI.py",
+              "Config/Template_Settings/intro_1.json": "Sources/Intro/intro_1.json",
+              "Story/Video/procedural_intro.py": "Sources/Intro/procedural_intro.py",
+              # Sources/Outro/
+              "API/Audio_Text/outro_AI.py": "Sources/Outro/outro_AI.py",
+              "Config/Template_Settings/outro_1.json": "Sources/Outro/outro_1.json",
+              # Sources/CTA/
+              "API/Audio_Text/cta_AI.py": "Sources/CTA/cta_AI.py",
+              "Config/Template_Settings/cta_default.json": "Sources/CTA/cta_default.json",
+              "Story/Thumbnails/cta_maker.py": "Sources/CTA/cta_maker.py",
+              # Story/ & Story/Uploader/
+              "Story/Subtitles_Text/ass_builder.py": "Story/ass_builder.py",
+              "Story/Pipeline_Orchestration/composer.py": "Story/composer.py",
+              "Story/Pipeline_Orchestration/duration.py": "Story/duration.py",
+              "Story/Video/fetch_background.py": "Story/fetch_background.py",
+              "Story/Final_Render/ffmpeg_render.py": "Story/ffmpeg_render.py",
+              "Story/Video/ffmpeg_utils.py": "Story/ffmpeg_utils.py",
+              "Story/Audio/generate_voice.py": "Story/generate_voice.py",
+              "Story/Content/get_hadith.py": "Story/get_hadith.py",
+              "Story/Final_Render/render_video.py": "Story/render_video.py",
+              "Story/Content/translator.py": "Story/translator.py",
+              "Story/Upload/final_upload.py": "Story/Uploader/final_upload.py",
+              "Uploader/story_upload.py": "Story/Uploader/story_upload.py",
+          }
+          for s, d in sources_map.items():
+              cp_file(s, d)
+
+          # Assets_Config/
+          assets_dir = ROOT / "Assets"
+          if assets_dir.exists():
+              for f in assets_dir.iterdir():
+                  if f.is_file() and f.name != "__init__.py":
+                      shutil.copy2(f, DEPLOY / "Assets_Config" / f.name)
+
+          configs = [
+              "Config/App_Configs/app_config.json",
+              "Config/Language_Settings/ar_font_settings.json",
+              "Config/Language_Settings/ar_strings.json",
+              "Config/Style_Settings/arabic_style.json",
+              "Config/App_Configs/colors.json",
+              "Config/App_Configs/default_template.json",
+              "Config/Language_Settings/en_font_settings.json",
+              "Config/Language_Settings/en_strings.json",
+              "Config/Style_Settings/english_style.json",
+              "Config/Language_Settings/hi_font_settings.json",
+              "Config/Language_Settings/hi_strings.json",
+              "Config/Style_Settings/hindi_style.json",
+              "Config/App_Configs/palette.py",
+              "Config/Template_Settings/thumb_style_1.json",
+              "Config/Template_Settings/thumb_style_2.json",
+              "Config/App_Configs/video_settings.json",
+          ]
+          for c in configs:
+              cp_file(c, f"Assets_Config/{Path(c).name}")
+
+          # Update fallback module names & Assets_Config paths
+          replacements = {
+              "ai_fallback": "all_ai_fallback",
+              "audio_text_url_fallback": "all_audio_text_url_fallback",
+              "islamic_fallback": "all_islamic_fallback",
+              "islamic_url_fallback": "all_islamic_url_fallback",
+              "music_fallback": "all_music_fallback",
+              "translate_fallback": "all_translate_fallback",
+              "video_fallback": "all_video_fallback",
+              "voice_fallback": "all_voice_fallback",
+              '"Assets"': '"Assets_Config"',
+              "'Assets'": "'Assets_Config'",
+              '/ "Assets"': '/ "Assets_Config"',
+          }
+          for py_file in DEPLOY.rglob("*.py"):
+              txt = py_file.read_text(encoding="utf-8", errors="ignore")
+              for old, new in replacements.items():
+                  txt = txt.replace(old, new)
+              py_file.write_text(txt, encoding="utf-8")
+
+          # Remove old folders at root
+          for old_dir in ["API", "Assets", "Config", "Story", "URL", "Uploader"]:
+              p = ROOT / old_dir
+              if p.exists() and p.is_dir():
+                  shutil.rmtree(p)
+
+          print("Deployment file count:", sum(1 for _ in DEPLOY.rglob("*") if _.is_file()))
+          PYEOF
+
+      - name: 💾 Commit & Push to Development Repo
+        run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git status --short
@@ -25,6 +190,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "ℹ️ Nothing to commit."
           else
-            git commit -m "chore: restore full project tree from 93d66a7"
+            git commit -m "feat: convert to Deployment/ structure and clean old folders"
             git push
           fi
