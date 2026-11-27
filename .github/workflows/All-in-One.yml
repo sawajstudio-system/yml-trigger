@@ -1,9 +1,4 @@
-# ════════════════════════════════════════════════════════════════
-# FILE: .github/workflows/story.yml
-# SAARI FILES + FOLDERS ISKE ANDAR HI HAIN (no checkout needed)
-# OUTPUT: temp/Final_Story.mp4
-# ════════════════════════════════════════════════════════════════
-name: 🎬 Sawaj Studio — Hindi Story (All-in-One)
+name: 🎬 Sawaj Studio — Deployment Structure (All-in-One)
 
 on:
   workflow_dispatch:
@@ -23,124 +18,128 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      # ── 1 ── Python
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # ── 2 ── ffmpeg + Hindi fonts
-      - name: 📦 Install ffmpeg + fonts
+      - name: 📦 Install FFmpeg & Fonts
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ffmpeg fonts-noto fonts-noto-core \
-            fonts-noto-extra fonts-dejavu fonts-liberation
-          fc-cache -f -v
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
 
-      # ── 3 ── Python packages
-      - name: 🐍 Install packages
-        run: pip install requests pillow numpy
-
-      # ── 4 ── 🏗️ SAARI FILES + FOLDERS YAHAN BANENGE
-      - name: 🏗️ Create full project structure
+      - name: 🐍 Install Python Packages
         run: |
-          mkdir -p API/AI_Models API/Audio_Text API/Islamic_Content \
-                   API/Music_Sources API/Photo_Sources API/Video_Sources
-          mkdir -p Assets Config/App_Configs Config/Language_Settings \
-                   Config/Style_Settings Config/Template_Settings
-          mkdir -p Story/Audio Story/Content Story/Final_Render \
-                   Story/Pipeline_Orchestration Story/Runtime_Logs \
-                   Story/Subtitles_Text Story/Thumbnails Story/Upload Story/Video
-          mkdir -p URL/Islamic URL/Media URL/TTS_Translation URL/Text_Content
-          mkdir -p Uploader temp
-          touch API/__init__.py API/AI_Models/__init__.py API/Audio_Text/__init__.py \
-                API/Islamic_Content/__init__.py API/Music_Sources/__init__.py \
-                API/Photo_Sources/__init__.py API/Video_Sources/__init__.py \
-                Assets/__init__.py Config/__init__.py \
-                Config/App_Configs/__init__.py Config/Language_Settings/__init__.py \
-                Config/Style_Settings/__init__.py Config/Template_Settings/__init__.py \
-                Story/__init__.py Story/Audio/__init__.py Story/Content/__init__.py \
-                Story/Final_Render/__init__.py Story/Pipeline_Orchestration/__init__.py \
-                Story/Subtitles_Text/__init__.py Story/Thumbnails/__init__.py \
-                Story/Upload/__init__.py Story/Video/__init__.py \
-                URL/__init__.py URL/Islamic/__init__.py URL/Media/__init__.py \
-                URL/TTS_Translation/__init__.py URL/Text_Content/__init__.py \
-                Uploader/__init__.py Story/Runtime_Logs/.gitkeep
-          echo "✅ 25+ folders + 30 __init__.py ready"
+          python -m pip install --upgrade pip
+          pip install requests edge-tts google-api-python-client google-auth-httplib2 google-auth-oauthlib Pillow mutagen numpy PyYAML
 
-      # ── 5 ── 📝 SAARI CONFIG JSONs
-      - name: 📝 Create config files
+      - name: 🏗️ Create New Deployment Folder Structure
         run: |
-          cat > Config/App_Configs/app_config.json <<'JSON'
+          mkdir -p Deployment/Sources/Fallback \
+                   Deployment/Sources/Intro \
+                   Deployment/Sources/Outro \
+                   Deployment/Sources/CTA \
+                   Deployment/Assets_Config \
+                   Deployment/Story/Uploader \
+                   Deployment/temp
+
+          touch Deployment/Sources/__init__.py \
+                Deployment/Sources/Fallback/__init__.py \
+                Deployment/Sources/Intro/__init__.py \
+                Deployment/Sources/Outro/__init__.py \
+                Deployment/Sources/CTA/__init__.py \
+                Deployment/Assets_Config/__init__.py \
+                Deployment/Story/__init__.py \
+                Deployment/Story/Uploader/__init__.py \
+                Deployment/Story/.gitkeep
+
+          cat > Deployment/.gitignore <<'EOF'
+          temp/
+          *.tmp
+          __pycache__/
+          *.pyc
+          .env
+          EOF
+
+          cat > Deployment/requirements.txt <<'EOF'
+          requests
+          edge-tts
+          google-api-python-client
+          google-auth-httplib2
+          google-auth-oauthlib
+          Pillow
+          mutagen
+          numpy
+          PyYAML
+          EOF
+          echo "✅ Deployment folder structure ready"
+
+      - name: 📝 Create Assets_Config JSONs, Fonts & Logo
+        run: |
+          cat > Deployment/Assets_Config/app_config.json <<'JSON'
           {"app_name":"Sawaj Studio","version":"2.0.0","timezone":"Asia/Kolkata","default_language":"hi"}
           JSON
-          cat > Config/Language_Settings/hi_strings.json <<'JSON'
+          cat > Deployment/Assets_Config/hi_strings.json <<'JSON'
           {"intro_default":"सवाज स्टूडियो प्रस्तुत करता है","outro_default":"जज़ाकअल्लाह खैर","cta_default":"रोज़ाना हदीस के लिए फॉलो करें","hadith_prefix":"हदीस शरीफ"}
           JSON
-          cat > Config/Language_Settings/hi_font_settings.json <<'JSON'
+          cat > Deployment/Assets_Config/hi_font_settings.json <<'JSON'
           {"font":"YatraOne.ttf","size":65,"style_name":"Hindi"}
           JSON
-          cat > Config/Template_Settings/intro_1.json <<'JSON'
-          {"duration":2.5,"text":"SAWAJ STUDIO Presents","animation":"fade"}
-          JSON
-          cat > Config/Template_Settings/outro_1.json <<'JSON'
-          {"duration":3.5,"text":"JazakAllah Khair","animation":"fade"}
-          JSON
-          cat > Config/Template_Settings/cta_default.json <<'JSON'
-          {"text":"Like • Share • Follow","duration":5.0}
-          JSON
-          cat > Config/Style_Settings/hindi_style.json <<'JSON'
+          cat > Deployment/Assets_Config/hindi_style.json <<'JSON'
           {"primary_color":"&H00FFFFFF&","outline":3,"shadow":2,"margin_v":570}
           JSON
-          echo "✅ Config JSONs ready"
+          cat > Deployment/Sources/Intro/intro_1.json <<'JSON'
+          {"duration":2.5,"text":"SAWAJ STUDIO Presents","animation":"fade"}
+          JSON
+          cat > Deployment/Sources/Outro/outro_1.json <<'JSON'
+          {"duration":3.5,"text":"JazakAllah Khair","animation":"fade"}
+          JSON
+          cat > Deployment/Sources/CTA/cta_default.json <<'JSON'
+          {"text":"Like • Share • Follow","duration":5.0}
+          JSON
 
-      # ── 6 ── 🖼️ Fonts + Logo (base64 se decode)
-      - name: 🖼️ Download real fonts + logo
-        run: |
-          # Google Fonts se Hindi + English fonts
-          curl -sL -o Assets/YatraOne.ttf "https://github.com/google/fonts/raw/main/ofl/yatraone/YatraOne-Regular.ttf" || echo "⚠️ YatraOne fail"
-          curl -sL -o Assets/PlayfairDisplay.ttf "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf" || echo "⚠️ Playfair fail"
-          curl -sL -o Assets/Amiri-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/amiri/Amiri-Regular.ttf" || echo "⚠️ Amiri fail"
-          # Fallback system font
-          if [ ! -s Assets/YatraOne.ttf ]; then
-            cp /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf Assets/YatraOne.ttf 2>/dev/null || true
+          curl -sL -o Deployment/Assets_Config/YatraOne.ttf "https://github.com/google/fonts/raw/main/ofl/yatraone/YatraOne-Regular.ttf" || true
+          curl -sL -o Deployment/Assets_Config/PlayfairDisplay.ttf "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf" || true
+          curl -sL -o Deployment/Assets_Config/Amiri-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/amiri/Amiri-Regular.ttf" || true
+
+          if [ ! -s Deployment/Assets_Config/YatraOne.ttf ]; then
+            cp /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf Deployment/Assets_Config/YatraOne.ttf 2>/dev/null || true
           fi
-          # Simple logo (500x180 golden circle)
+
           python - <<'PY'
           from PIL import Image, ImageDraw, ImageFont
           img = Image.new("RGBA", (500, 180), (0,0,0,0))
           d = ImageDraw.Draw(img)
           d.ellipse([10,10,170,170], fill=(218,178,60,255), outline=(255,248,190,255), width=4)
           try:
-              f = ImageFont.truetype("Assets/PlayfairDisplay.ttf", 60)
-          except:
+              f = ImageFont.truetype("Deployment/Assets_Config/PlayfairDisplay.ttf", 60)
+          except Exception:
               f = ImageFont.load_default()
           d.text((250, 90), "SAWAJ", font=f, fill=(255,248,190,255), anchor="mm")
-          img.save("Assets/sawaj_logo.png")
-          print("✅ Logo created")
+          img.save("Deployment/Assets_Config/sawaj_logo.png")
           PY
-          ls -lh Assets/
 
-      # ── 7 ── 🐍 SAARI PYTHON FILES (base64 decoded)
-      - name: 🐍 Create all Python files
+      - name: 🐍 Create Sources, Fallbacks & Story Code
         run: |
-          # ═══ API/AI_Models ═══
-          cat > API/AI_Models/gemini.py <<'PY'
+          # ── Sources/ ──
+          cat > Deployment/Sources/gemini.py <<'PY'
           import os, requests, random
           def generate(prompt, max_tokens=500):
-              api_key = os.getenv("GEMINI_API_KEY")
-              if not api_key: return None
+              k = os.getenv("GEMINI_API_KEY")
+              if not k: return None
               styles = ["emotional", "motivational", "calm", "storytelling", "philosophical"]
               sp = f"Write in a {random.choice(styles)} tone.\n\n{prompt}"
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={k}"
               try:
                   r = requests.post(url, json={"contents":[{"parts":[{"text":sp}]}],"generationConfig":{"maxOutputTokens":max_tokens,"temperature":0.9}}, timeout=30)
                   if r.status_code == 200:
                       return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-              except: pass
+              except Exception: pass
               return None
           PY
-          cat > API/AI_Models/openrouter.py <<'PY'
+
+          cat > Deployment/Sources/openrouter.py <<'PY'
           import os, requests
           def generate(prompt, max_tokens=500):
               k = os.getenv("OPENROUTER_API_KEY")
@@ -150,10 +149,11 @@ jobs:
                       headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
                       json={"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
                   if r.status_code == 200: return r.json()["choices"][0]["message"]["content"].strip()
-              except: pass
+              except Exception: pass
               return None
           PY
-          cat > API/AI_Models/groq.py <<'PY'
+
+          cat > Deployment/Sources/groq.py <<'PY'
           import os, requests
           def generate(prompt, max_tokens=500):
               k = os.getenv("GROQ_API_KEY")
@@ -163,94 +163,52 @@ jobs:
                       headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
                       json={"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
                   if r.status_code == 200: return r.json()["choices"][0]["message"]["content"].strip()
-              except: pass
+              except Exception: pass
               return None
           PY
-          cat > API/AI_Models/cohere.py <<'PY'
-          import os, requests
-          def generate(prompt, max_tokens=500):
-              k = os.getenv("COHERE_API_KEY")
-              if not k: return None
-              try:
-                  r = requests.post("https://api.cohere.com/v2/chat",
-                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
-                      json={"model":"command-r-plus","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
-                  if r.status_code == 200: return r.json()["message"]["content"][0]["text"].strip()
-              except: pass
-              return None
+
+          cat > Deployment/Sources/fawaz.py <<'PY'
+          import random, re, requests
+          BASE_URLS = ["https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1", "https://raw.githubusercontent.com/fawazahmed0/hadith-api/1"]
+          BOOKS = [
+              {"eng": "eng-bukhari", "ara": "ara-bukhari", "name": "Sahih al-Bukhari", "max": 7563},
+              {"eng": "eng-muslim", "ara": "ara-muslim", "name": "Sahih Muslim", "max": 7450},
+              {"eng": "eng-tirmidhi", "ara": "ara-tirmidhi", "name": "Jami at-Tirmidhi", "max": 3956},
+          ]
+          def _clean(t):
+              return re.sub(r"\s+", " ", re.sub(r"[\u200b-\u200f\ufeff]", "", str(t or "")).replace("\n", " ")).strip()
+          def fetch(book=None, number=None):
+              b = random.choice(BOOKS)
+              for _ in range(5):
+                  n = int(number) if number else random.randint(1, b["max"])
+                  for base in BASE_URLS:
+                      try:
+                          r = requests.get(f"{base}/editions/{b['eng']}/{n}.json", timeout=15)
+                          if r.status_code != 200: continue
+                          h = r.json().get("hadiths", [])
+                          if not h: continue
+                          eng = _clean(h[0].get("text", ""))
+                          if len(eng) < 25: continue
+                          r2 = requests.get(f"{base}/editions/{b['ara']}/{n}.json", timeout=10)
+                          ara = _clean(r2.json().get("hadiths", [{}])[0].get("text", "")) if r2.status_code == 200 else ""
+                          if ara:
+                              return {"collection": b["name"], "number": str(h[0].get("hadithnumber") or n), "english": eng, "arabic": ara}
+                      except Exception: continue
+              return {"collection": "Sahih al-Bukhari", "number": "1", "english": "The reward of deeds depends upon the intentions.", "arabic": "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ"}
           PY
-          cat > API/AI_Models/nvidia.py <<'PY'
-          import os, requests
-          def generate(prompt, max_tokens=500):
-              k = os.getenv("NVIDIA_API_KEY")
-              if not k: return None
+
+          cat > Deployment/Sources/mymemory.py <<'PY'
+          import requests
+          def translate(text, target_lang="hi"):
               try:
-                  r = requests.post("https://integrate.api.nvidia.com/v1/chat/completions",
-                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
-                      json={"model":"nvidia/llama-3.1-nemotron-70b-instruct","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
+                  r = requests.get("https://api.mymemory.translated.net/get", params={"q": text[:450], "langpair": f"en|{target_lang}"}, timeout=15)
                   if r.status_code == 200:
-                      m = r.json()["choices"][0]["message"]
-                      return (m.get("content") or m.get("reasoning_content") or "").strip() or None
-              except: pass
-              return None
+                      return r.json().get("responseData", {}).get("translatedText", "")
+              except Exception: pass
+              return ""
           PY
-          cat > API/AI_Models/cloudflare.py <<'PY'
-          import os, requests
-          def generate(prompt, max_tokens=500):
-              aid = os.getenv("CLOUDFLARE_ACCOUNT_ID"); tok = os.getenv("CLOUDFLARE_API_TOKEN")
-              if not aid or not tok: return None
-              try:
-                  r = requests.post(f"https://api.cloudflare.com/client/v4/accounts/{aid}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-                      headers={"Authorization":f"Bearer {tok}","Content-Type":"application/json"},
-                      json={"messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
-                  if r.status_code == 200:
-                      d = r.json()
-                      if d.get("success"): return d.get("result",{}).get("response","").strip() or None
-              except: pass
-              return None
-          PY
-          cat > API/AI_Models/anges.py <<'PY'
-          import os, requests
-          def generate(prompt, max_tokens=500):
-              k = os.getenv("ANGES_API_KEY")
-              if not k: return None
-              try:
-                  r = requests.post("https://apihub.agnes-ai.com/v1/chat/completions",
-                      headers={"Authorization":f"Bearer {k}","Content-Type":"application/json"},
-                      json={"model":"agnes-2.5-flash","messages":[{"role":"user","content":prompt}],"max_tokens":max_tokens}, timeout=30)
-                  if r.status_code == 200: return r.json()["choices"][0]["message"]["content"].strip()
-              except: pass
-              return None
-          PY
-          cat > API/AI_Models/ai_fallback.py <<'PY'
-          import sys, os
-          sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-          CHAIN = []
-          for name in ["gemini","openrouter","groq","cohere","nvidia","cloudflare","anges"]:
-              try:
-                  m = __import__(name)
-                  CHAIN.append((name.capitalize(), m))
-              except ImportError:
-                  print(f"[ai_fallback] ⚠️ {name} missing")
-          LAST_USED_AI = "None"
-          FAILED_AIS = []
-          def generate_text(prompt, max_tokens=500):
-              global LAST_USED_AI, FAILED_AIS
-              LAST_USED_AI = "None"; FAILED_AIS = []
-              for name, mod in CHAIN:
-                  try:
-                      res = mod.generate(prompt, max_tokens)
-                      if res and res.strip():
-                          LAST_USED_AI = name
-                          print(f"[ai_fallback] ✅ {name} succeeded")
-                          return res.strip()
-                  except Exception as e:
-                      print(f"[ai_fallback] ❌ {name}: {e}")
-                  FAILED_AIS.append(name)
-              return None
-          PY
-          # ═══ API/Audio_Text ═══
-          cat > API/Audio_Text/elevenlabs.py <<'PY'
+
+          cat > Deployment/Sources/elevenlabs.py <<'PY'
           import os, requests
           def generate(text, output_path="temp/voice.mp3"):
               k = os.getenv("ELEVENLABS_API_KEY")
@@ -263,252 +221,174 @@ jobs:
                       os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
                       open(output_path,"wb").write(r.content)
                       return output_path
-              except: pass
+              except Exception: pass
               return None
           PY
-          cat > API/Audio_Text/intro_AI.py <<'PY'
-          import os, sys
-          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"AI_Models"))
-          def generate_intro():
-              try:
-                  from ai_fallback import generate_text
-                  t = generate_text("Write 3-5 word intro for Islamic video. Only phrase.", 20)
-                  if t: return t.replace('"','').replace("'","").strip()
-              except: pass
-              return "SAWAJ STUDIO Presents"
-          PY
-          cat > API/Audio_Text/outro_AI.py <<'PY'
-          import os, sys
-          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"AI_Models"))
-          def generate_outro():
-              try:
-                  from ai_fallback import generate_text
-                  t = generate_text("Write 2-4 word outro (like JazakAllah Khair). Only phrase.", 20)
-                  if t: return t.replace('"','').replace("'","").strip()
-              except: pass
-              return "JazakAllah Khair"
-          PY
-          cat > API/Audio_Text/cta_AI.py <<'PY'
-          import os, sys
-          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"AI_Models"))
-          def generate_cta():
-              try:
-                  from ai_fallback import generate_text
-                  t = generate_text("Write 3-5 word CTA (like Follow for more). Only phrase.", 20)
-                  if t: return t.replace('"','').replace("'","").strip()
-              except: pass
-              return "Follow for Daily Hadith"
-          PY
-          cat > API/Audio_Text/voice_fallback.py <<'PY'
-          import os, sys
-          sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-          sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),"URL","TTS_Translation"))
-          def generate(text, output_path="temp/voice.mp3"):
-              try:
-                  from elevenlabs import generate as el
-                  if el(text, output_path): return output_path
-              except: pass
-              try:
-                  from edge_tts import generate as et
-                  if et(text, output_path): return output_path
-              except: pass
-              return None
-          PY
-          # ═══ URL/Islamic ═══
-          cat > URL/Islamic/fawaz.py <<'PY'
-          import random, requests
-          BOOKS = ["bukhari","muslim","abudawud","tirmidhi","nasai","ibnmajah"]
-          def fetch(book=None, number=None):
-              try:
-                  b = book or random.choice(BOOKS)
-                  n = number or random.randint(1, 500)
-                  r = requests.get(f"https://random-hadith-generator.vercel.app/{b}/{n}", timeout=15)
-                  if r.status_code == 200:
-                      d = r.json()
-                      if d.get("data"):
-                          return {"english": d["data"].get("hadith_english",""), "collection": b, "number": str(n), "book": b}
-              except Exception as e:
-                  print(f"[fawaz] {e}")
-              # fallback
-              return {"english":"The best among you are those who have the best manners and character.","collection":"bukhari","number":"1","book":"bukhari"}
-          PY
-          cat > URL/TTS_Translation/mymemory.py <<'PY'
-          import requests
-          def translate(text, target_lang="hi"):
-              try:
-                  r = requests.get(f"https://api.mymemory.translated.net/get?q={text}&langpair=en|{target_lang}", timeout=15)
-                  if r.status_code == 200:
-                      return r.json()["responseData"]["translatedText"]
-              except: pass
-              return text
-          PY
-          cat > URL/TTS_Translation/edge_tts.py <<'PY'
+
+          cat > Deployment/Sources/edge_tts.py <<'PY'
           import os, asyncio
           def generate(text, output_path="temp/voice.mp3"):
               try:
                   import edge_tts
+                  os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
                   async def _run():
-                      c = edge_tts.Communicate(text, voice="hi-IN-SwaraNeural")
-                      await c.save(output_path)
+                      await edge_tts.Communicate(text, voice="hi-IN-SwaraNeural").save(output_path)
                   asyncio.run(_run())
                   if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                       return output_path
-              except Exception as e:
-                  print(f"[edge_tts] {e}")
+              except Exception: pass
               return None
           PY
-          # ═══ API/Video_Sources ═══
-          cat > API/Video_Sources/pexels_video.py <<'PY'
+
+          cat > Deployment/Sources/pexels_video.py <<'PY'
           import os, requests
           def fetch(query="islamic mosque", duration=20, output_path="temp/bg.mp4"):
               k = os.getenv("PEXELS_API_KEY")
               if not k: return None
               try:
-                  r = requests.get(f"https://api.pexels.com/videos/search?query={query}&orientation=portrait&per_page=3",
-                      headers={"Authorization":k}, timeout=15)
-                  if r.status_code == 200:
-                      vids = r.json().get("videos",[])
-                      if vids and vids[0].get("video_files"):
-                          url = vids[0]["video_files"][0]["link"]
-                          data = requests.get(url, timeout=30).content
-                          os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                          open(output_path,"wb").write(data)
-                          return output_path
-              except: pass
+                  r = requests.get(f"https://api.pexels.com/videos/search?query={query}&orientation=portrait&per_page=3", headers={"Authorization":k}, timeout=15)
+                  if r.status_code == 200 and r.json().get("videos"):
+                      url = r.json()["videos"][0]["video_files"][0]["link"]
+                      os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
+                      open(output_path,"wb").write(requests.get(url, timeout=30).content)
+                      return output_path
+              except Exception: pass
               return None
           PY
-          cat > API/Video_Sources/pixabay_video.py <<'PY'
+
+          cat > Deployment/Sources/pixabay_video.py <<'PY'
           import os, requests
           def fetch(query="islamic mosque", duration=20, output_path="temp/bg.mp4"):
               k = os.getenv("PIXABAY_API_KEY")
               if not k: return None
               try:
                   r = requests.get(f"https://pixabay.com/api/videos/?key={k}&q={query}&orientation=vertical&per_page=3", timeout=15)
-                  if r.status_code == 200:
-                      hits = r.json().get("hits",[])
-                      if hits:
-                          url = hits[0]["videos"]["large"]["url"]
-                          data = requests.get(url, timeout=30).content
-                          os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                          open(output_path,"wb").write(data)
-                          return output_path
-              except: pass
+                  if r.status_code == 200 and r.json().get("hits"):
+                      url = r.json()["hits"][0]["videos"]["large"]["url"]
+                      os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
+                      open(output_path,"wb").write(requests.get(url, timeout=30).content)
+                      return output_path
+              except Exception: pass
               return None
           PY
-          cat > API/Video_Sources/coverr.py <<'PY'
-          import os, requests
-          def fetch(query="nature", duration=20, output_path="temp/bg.mp4"):
-              k = os.getenv("COVERR_API_KEY")
-              if not k: return None
-              try:
-                  r = requests.get(f"https://api.coverr.co/videos?query={query}&page_size=3",
-                      headers={"Authorization":f"Bearer {k}"}, timeout=15)
-                  if r.status_code == 200:
-                      hits = r.json().get("hits",[])
-                      if hits:
-                          url = hits[0].get("urls",{}).get("mp4")
-                          if url:
-                              data = requests.get(url, timeout=30).content
-                              os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                              open(output_path,"wb").write(data)
-                              return output_path
-              except: pass
-              return None
-          PY
-          cat > API/Video_Sources/gradient.py <<'PY'
+
+          cat > Deployment/Sources/gradient.py <<'PY'
           import os, subprocess, random
           def fetch(duration=20, output_path="temp/bg.mp4", **kw):
-              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
               c0 = f"{random.randint(10,40):02x}{random.randint(10,40):02x}{random.randint(30,60):02x}"
               c1 = f"{random.randint(10,40):02x}{random.randint(10,40):02x}{random.randint(30,60):02x}"
               try:
-                  subprocess.run(f'ffmpeg -y -f lavfi -i "gradients=s=1080x1920:c0=0x{c0}:c1=0x{c1}:speed=0.005" -t {duration} -c:v libx264 -preset veryfast -crf 20 {output_path}',
-                      shell=True, check=True, capture_output=True)
+                  subprocess.run(f'ffmpeg -y -f lavfi -i "gradients=s=1080x1920:c0=0x{c0}:c1=0x{c1}:speed=0.005" -t {duration} -c:v libx264 -preset veryfast -crf 22 {output_path}', shell=True, check=True, capture_output=True)
                   return output_path
-              except: return None
+              except Exception: return None
           PY
-          # ═══ API/Music_Sources ═══
-          cat > API/Music_Sources/freesound.py <<'PY'
+
+          cat > Deployment/Sources/freesound.py <<'PY'
           import os, subprocess, requests
           def fetch(query="ambient islamic", duration=60, output_path="temp/music.mp3"):
+              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
               k = os.getenv("FREESOUND_API_KEY")
               if k:
                   try:
-                      r = requests.get("https://freesound.org/apiv2/search/text/",
-                          params={"query":query,"token":k,"fields":"previews","page_size":5}, timeout=15)
-                      if r.status_code == 200:
-                          results = r.json().get("results",[])
-                          if results:
-                              url = results[0]["previews"].get("preview-hq-mp3")
-                              if url:
-                                  data = requests.get(url, timeout=30).content
-                                  raw = f"{output_path}.raw.mp3"
-                                  os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                                  open(raw,"wb").write(data)
-                                  subprocess.run(f'ffmpeg -y -stream_loop -1 -i "{raw}" -af "volume=0.2,afade=t=in:st=0:d=2" -t {duration} -c:a libmp3lame "{output_path}"',
-                                      shell=True, check=True, capture_output=True)
-                                  os.remove(raw)
-                                  return output_path
-                  except: pass
-              return _sine(duration, output_path)
-          def _sine(duration, output_path):
-              os.makedirs(os.path.dirname(output_path), exist_ok=True)
-              try:
-                  subprocess.run(f'ffmpeg -y -f lavfi -i "sine=frequency=110:duration={duration}" -af "volume=0.12" -c:a libmp3lame "{output_path}"',
-                      shell=True, check=True, capture_output=True)
-                  return output_path
-              except: return None
-          PY
-          cat > API/Music_Sources/pixabay_music.py <<'PY'
-          import os
-          def fetch(duration=60, output_path="temp/music.mp3", **kw):
-              return None
-          PY
-          # ═══ Story pieces ═══
-          cat > Story/Final_Render/ffmpeg_render.py <<'PY'
-          import os, subprocess
-          def render_final_video(bg_video, music_path, voice_path, master_ass_path, cta_image_path, duration, output_path="temp/Final_Story.mp4", fonts_dir=None, logo_path=None):
-              if not bg_video or not os.path.exists(bg_video) or not os.path.exists(voice_path): return None
-              if not fonts_dir or not os.path.exists(fonts_dir):
-                  fonts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "Assets"))
-              has_music = bool(music_path and os.path.exists(music_path) and os.path.getsize(music_path) > 0)
-              cmd = ["ffmpeg","-y","-stream_loop","-1","-i",bg_video,"-i",voice_path]
-              if has_music: cmd += ["-i", music_path]
-              cmd += ["-loop","1","-i",cta_image_path]
-              cta_idx = 3 if has_music else 2
-              abs_ass = os.path.abspath(master_ass_path).replace("\\","/").replace(":","\\:")
-              abs_fonts = os.path.abspath(fonts_dir).replace("\\","/").replace(":","\\:")
-              v = f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[bg]subtitles='{abs_ass}':fontsdir='{abs_fonts}'[v_sub];[v_sub][{cta_idx}:v]overlay=0:0:enable='gte(t,{max(0,duration-5)})'[v_out]"
-              if has_music:
-                  a = "[2:a]volume=0.15[bgm];[1:a][bgm]amix=inputs=2:duration=first[a_out]"
-              else:
-                  a = "[1:a]volume=1.0[a_out]"
-              cmd += ["-filter_complex", f"{v};{a}", "-map","[v_out]","-map","[a_out]",
-                      "-c:v","libx264","-preset","ultrafast","-crf","30","-r","24",
-                      "-c:a","aac","-b:a","128k","-t",f"{duration:.2f}", output_path]
-              try:
-                  r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-                  if r.returncode != 0:
-                      print(r.stderr[-1500:]); return None
-                  return output_path
-              except Exception as e:
-                  print(f"[ffmpeg] {e}"); return None
-          PY
-          cat > Story/Thumbnails/cta_maker.py <<'PY'
-          import os
-          from PIL import Image, ImageDraw, ImageFont
-          def generate_cta_image(output_path="temp/cta_image.png"):
-              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
-              img = Image.new("RGBA",(1080,1920),(0,0,0,0))
-              d = ImageDraw.Draw(img)
-              # transparent — overlay mein add hoga
-              img.save(output_path)
+                      r = requests.get("https://freesound.org/apiv2/search/text/", params={"query":query,"token":k,"fields":"previews","page_size":5}, timeout=15)
+                      if r.status_code == 200 and r.json().get("results"):
+                          url = r.json()["results"][0]["previews"].get("preview-hq-mp3")
+                          if url:
+                              raw = f"{output_path}.raw.mp3"
+                              open(raw,"wb").write(requests.get(url, timeout=30).content)
+                              subprocess.run(f'ffmpeg -y -stream_loop -1 -i "{raw}" -af "volume=0.2,afade=t=in:st=0:d=2" -t {duration} -c:a libmp3lame "{output_path}"', shell=True, check=True, capture_output=True)
+                              os.remove(raw)
+                              return output_path
+                  except Exception: pass
+              subprocess.run(f'ffmpeg -y -f lavfi -i "sine=frequency=110:duration={duration}" -af "volume=0.10" -c:a libmp3lame "{output_path}"', shell=True, check=True, capture_output=True)
               return output_path
           PY
-          cat > Story/Subtitles_Text/ass_builder.py <<'PY'
-          import os
+
+          # ── Sources/Fallback/ ──
+          cat > Deployment/Sources/Fallback/all_ai_fallback.py <<'PY'
+          import os, sys
+          SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
+          CHAIN = []
+          for name in ["gemini", "openrouter", "groq"]:
+              try: CHAIN.append((name.capitalize(), __import__(name)))
+              except ImportError: pass
+          def generate_text(prompt, max_tokens=500):
+              for _, mod in CHAIN:
+                  try:
+                      res = mod.generate(prompt, max_tokens)
+                      if res and res.strip(): return res.strip()
+                  except Exception: pass
+              return None
+          PY
+
+          cat > Deployment/Sources/Fallback/all_islamic_fallback.py <<'PY'
+          import os, sys
+          SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
+          from fawaz import fetch as fawaz
+          def fetch(book=None, number=None):
+              return fawaz(book=book, number=number)
+          PY
+
+          cat > Deployment/Sources/Fallback/all_translate_fallback.py <<'PY'
+          import os, sys
+          SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
+          from all_ai_fallback import generate_text
+          from mymemory import translate as mymemory
+          def translate(text, target_lang="hi"):
+              res = generate_text(f"Translate to {target_lang}. Only output translation:\n\n{text}", 500)
+              return res if res else mymemory(text, target_lang)
+          PY
+
+          cat > Deployment/Sources/Fallback/all_voice_fallback.py <<'PY'
+          import os, sys
+          SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
+          from elevenlabs import generate as elevenlabs_tts
+          from edge_tts import generate as edge_tts
+          def generate(text, output_path="temp/voice.mp3"):
+              return elevenlabs_tts(text, output_path) or edge_tts(text, output_path)
+          PY
+
+          cat > Deployment/Sources/Fallback/all_video_fallback.py <<'PY'
+          import os, sys
+          SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
+          from pexels_video import fetch as pv
+          from pixabay_video import fetch as pbv
+          from gradient import fetch as gv
+          def fetch(query="islamic mosque", duration=20, output_path="temp/bg.mp4"):
+              return pv(query, duration, output_path) or pbv(query, duration, output_path) or gv(duration, output_path)
+          PY
+
+          cat > Deployment/Sources/Fallback/all_music_fallback.py <<'PY'
+          import os, sys
+          SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
+          from freesound import fetch as fs
+          def fetch(query="ambient islamic", duration=60, output_path="temp/music.mp3"):
+              return fs(query, duration, output_path)
+          PY
+
+          # ── Story/ & Uploader/ ──
+          cat > Deployment/Story/duration.py <<'PY'
+          import os, subprocess
+          def get_audio_duration(p):
+              if not os.path.exists(p): return 15.0
+              try:
+                  r = subprocess.run(f'ffprobe -v error -show_entries format=duration -of csv=p=0 "{p}"', shell=True, capture_output=True, text=True)
+                  return float(r.stdout.strip())
+              except Exception: return 15.0
+          PY
+
+          cat > Deployment/Story/ass_builder.py <<'PY'
+          import os, re
           def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main.ass"):
               os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
+              clean_hi = re.sub(r'["\n\r]', " ", str(hindi_text or "")).strip()
               header = """[Script Info]
           ScriptType: v4.00+
           PlayResX: 1080
@@ -516,170 +396,114 @@ jobs:
 
           [V4+ Styles]
           Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-          Style: Hindi,Yatra One,90,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,40,40,475,1
+          Style: Hindi,Yatra One,65,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,5,60,60,0,1
 
           [Events]
           Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           """
-              with open(output_path,"w",encoding="utf-8") as f:
+              with open(output_path, "w", encoding="utf-8") as f:
                   f.write(header)
-                  f.write(f"Dialogue: 0,0:00:00.00,0:00:{duration:05.2f},Hindi,,0,0,0,,{hindi_text[:200]}\n")
+                  f.write(f"Dialogue: 0,0:00:00.00,0:00:{min(59.0, duration):05.2f},Hindi,,0,0,0,,{clean_hi[:220]}\n")
               return output_path
           PY
-          cat > Story/Pipeline_Orchestration/duration.py <<'PY'
-          import subprocess, os
-          def get_audio_duration(p):
-              if not os.path.exists(p): return 15.0
-              try:
-                  r = subprocess.run(f'ffprobe -v error -show_entries format=duration -of csv=p=0 "{p}"', shell=True, capture_output=True, text=True)
-                  return float(r.stdout.strip())
-              except: return 15.0
+
+          cat > Deployment/Story/ffmpeg_render.py <<'PY'
+          import os, subprocess
+          def render_final_video(bg_video, music_path, voice_path, master_ass_path, duration, output_path="temp/Final_Story.mp4", fonts_dir=None):
+              if not fonts_dir:
+                  deploy_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                  fonts_dir = os.path.join(deploy_root, "Assets_Config")
+              os.makedirs(os.path.dirname(output_path) or "temp", exist_ok=True)
+              abs_ass = os.path.abspath(master_ass_path).replace("\\","/").replace(":","\\:")
+              abs_fonts = os.path.abspath(fonts_dir).replace("\\","/").replace(":","\\:")
+              cmd = ["ffmpeg","-y","-stream_loop","-1","-i",bg_video,"-i",voice_path]
+              has_music = bool(music_path and os.path.exists(music_path))
+              if has_music: cmd += ["-i", music_path]
+              v = f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[bg]subtitles='{abs_ass}':fontsdir='{abs_fonts}'[v_out]"
+              a = "[2:a]volume=0.15[bgm];[1:a][bgm]amix=inputs=2:duration=first[a_out]" if has_music else "[1:a]volume=1.0[a_out]"
+              cmd += ["-filter_complex", f"{v};{a}", "-map","[v_out]","-map","[a_out]","-c:v","libx264","-preset","ultrafast","-crf","26","-r","24","-c:a","aac","-b:a","128k","-t",f"{duration:.2f}", output_path]
+              r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+              return output_path if r.returncode == 0 else None
           PY
-          cat > Story/Final_Render/render_video.py <<'PY'
+
+          cat > Deployment/Story/Uploader/story_upload.py <<'PY'
+          import os, time
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+          def upload_to_drive(file_path):
+              cid, csec, rtok, fid = os.getenv("GDRIVE_CLIENT_ID"), os.getenv("GDRIVE_CLIENT_SECRET"), os.getenv("GDRIVE_REFRESH_TOKEN"), os.getenv("GDRIVE_F_STORY_ID")
+              if not all([cid, csec, rtok]) or not os.path.exists(file_path): return None
+              creds = Credentials(None, refresh_token=rtok, client_id=cid, client_secret=csec, token_uri="https://oauth2.googleapis.com/token")
+              svc = build("drive", "v3", credentials=creds, cache_discovery=False)
+              meta = {"name": f"Story_Video_{int(time.time())}.mp4"}
+              if fid: meta["parents"] = [fid]
+              f = svc.files().create(body=meta, media_body=MediaFileUpload(file_path, mimetype="video/mp4", resumable=True), fields="id,webViewLink").execute()
+              return f.get("webViewLink")
+          PY
+
+          cat > Deployment/Story/composer.py <<'PY'
           import os, sys
-          D = os.path.dirname(os.path.abspath(__file__))
-          R = os.path.dirname(os.path.dirname(D))
-          for s in ["Story/Pipeline_Orchestration","Story/Subtitles_Text","Story/Thumbnails","Story/Final_Render"]:
-              sys.path.insert(0, os.path.join(R,s))
+          STORY_DIR = os.path.dirname(os.path.abspath(__file__))
+          DEPLOY_ROOT = os.path.dirname(STORY_DIR)
+          for p in [
+              os.path.join(DEPLOY_ROOT, "Sources"),
+              os.path.join(DEPLOY_ROOT, "Sources", "Fallback"),
+              os.path.join(DEPLOY_ROOT, "Assets_Config"),
+              os.path.join(STORY_DIR, "Uploader"),
+              STORY_DIR,
+          ]:
+              if p not in sys.path: sys.path.insert(0, p)
+
+          from all_islamic_fallback import fetch as fetch_hadith
+          from all_ai_fallback import generate_text
+          from all_translate_fallback import translate as translate_hi
+          from all_voice_fallback import generate as generate_voice
+          from all_video_fallback import fetch as fetch_video
+          from all_music_fallback import fetch as fetch_music
           from duration import get_audio_duration
-          from cta_maker import generate_cta_image
           from ass_builder import create_main_subtitles
           from ffmpeg_render import render_final_video
-          def build_and_render_story(bg_video, music_path, voice_path, hadith, hindi_text, intro_text, outro_text, cta_text, output_path="temp/Final_Story.mp4"):
-              os.makedirs("temp", exist_ok=True)
-              dur = get_audio_duration(voice_path) + 4.0
-              ass = create_main_subtitles(hadith, hindi_text, dur, "temp/main.ass")
-              cta = generate_cta_image("temp/cta_image.png")
-              return render_final_video(bg_video, music_path, voice_path, ass, cta, dur, output_path)
-          PY
-          # ═══ Uploader ═══
-          cat > Uploader/story_upload.py <<'PY'
-          import os
-          def upload_to_drive(path):
-              print(f"[upload] Video ready: {path}")
-              return None
-          PY
-          echo "✅ All Python files created"
+          from story_upload import upload_to_drive
 
-      # ── 8 ── 🚀 RUN PIPELINE (video banao)
-      - name: 🚀 Run pipeline
+          def run_pipeline():
+              os.makedirs("temp", exist_ok=True)
+              hadith = fetch_hadith()
+              hindi = generate_text(f"Translate to Hindi and add short moral (60 words). Only Hindi:\n{hadith['english']}", 250) or translate_hi(hadith["english"])
+              voice = generate_voice(hindi, "temp/voice.mp3")
+              if not voice: raise RuntimeError("Voice failed")
+              dur = get_audio_duration(voice) + 2.0
+              bg = fetch_video("islamic mosque", dur, "temp/bg.mp4")
+              music = fetch_music("soft ambient", dur, "temp/music.mp3")
+              ass = create_main_subtitles(hadith, hindi, dur, "temp/main.ass")
+              out = render_final_video(bg, music, voice, ass, dur, "temp/Final_Story.mp4")
+              if not out: raise RuntimeError("Render failed")
+              link = upload_to_drive(out)
+              print(f"✅ Done! Video: {out} | Drive: {link}")
+
+          if __name__ == "__main__":
+              run_pipeline()
+          PY
+
+      - name: 🚀 Run Pipeline in Deployment/Story
+        working-directory: Deployment/Story
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-          COVERR_API_KEY: ${{ secrets.COVERR_API_KEY }}
           FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
-          TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-          TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-        run: |
-          export PYTHONPATH="$PWD:$PWD/Story:$PWD/API:$PWD/URL"
-          pip install edge-tts
-          python - <<'PY'
-          import sys, os
-          sys.path.insert(0, os.path.join(os.getcwd(), "API","AI_Models"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "API","Audio_Text"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "API","Video_Sources"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "API","Music_Sources"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "URL","Islamic"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "URL","TTS_Translation"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Pipeline_Orchestration"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Final_Render"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Subtitles_Text"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "Story","Thumbnails"))
-          sys.path.insert(0, os.path.join(os.getcwd(), "Uploader"))
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+          GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+        run: python -u composer.py
 
-          from ai_fallback import generate_text
-          from fawaz import fetch as fetch_hadith
-          from intro_AI import generate_intro
-          from outro_AI import generate_outro
-          from cta_AI import generate_cta
-          from elevenlabs import generate as el
-          from edge_tts import generate as et
-          from pexels_video import fetch as pv
-          from pixabay_video import fetch as pbv
-          from coverr import fetch as cv
-          from gradient import fetch as gv
-          from freesound import fetch as fs
-          from render_video import build_and_render_story
-          from story_upload import upload_to_drive
-
-          print("🎬 STEP 1: Hadith fetch...")
-          h = fetch_hadith()
-          print(f"✅ Hadith: {h.get('collection')} #{h.get('number')}")
-
-          print("🎬 STEP 2: Hindi AI script...")
-          hindi = generate_text(f"Translate to Hindi, add moral. 70-80 words. Only Hindi:\n\n{h.get('english','')}", 250)
-          if not hindi:
-              hindi = "हदीस: " + h.get('english','')
-          print(f"✅ Hindi: {hindi[:80]}...")
-
-          print("🎬 STEP 3: Intro/Outro/CTA...")
-          intro, outro, cta = generate_intro(), generate_outro(), generate_cta()
-          print(f"✅ {intro} | {outro} | {cta}")
-
-          print("🎬 STEP 4: Voice...")
-          os.makedirs("temp", exist_ok=True)
-          full = f"यह हदीस {h.get('collection')} की है। {hindi}"
-          voice = "temp/voice.mp3"
-          if not el(full, voice):
-              if not et(full, voice):
-                  print("❌ Voice fail"); sys.exit(1)
-          print(f"✅ Voice: {voice}")
-
-          print("🎬 STEP 5: Background video...")
-          for fn, name in [(pv,"Pexels"),(pbv,"Pixabay"),(cv,"Coverr"),(gv,"Gradient")]:
-              if fn(output_path="temp/bg.mp4"):
-                  print(f"✅ BG: {name}"); break
-          else:
-              print("❌ BG fail"); sys.exit(1)
-
-          print("🎬 STEP 6: Music...")
-          music = "temp/music.mp3"
-          fs(duration=60, output_path=music)
-          print(f"✅ Music: {music}")
-
-          print("🎬 STEP 7: Final render...")
-          out = build_and_render_story("temp/bg.mp4", music, voice, h, hindi, intro, outro, cta, "temp/Final_Story.mp4")
-          if not out or not os.path.exists("temp/Final_Story.mp4"):
-              print("❌ Render fail"); sys.exit(1)
-          print("✅ VIDEO READY: temp/Final_Story.mp4")
-
-          print("🎬 STEP 8: Upload...")
-          link = upload_to_drive("temp/Final_Story.mp4")
-          print(f"✅ Done! Link: {link}")
-          PY
-
-      # ── 9 ── Verify + Artifact
-      - name: 📤 Upload video
+      - name: 📤 Upload Video Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Final_Story_${{ github.run_id }}
-          path: temp/Final_Story.mp4
+          path: Deployment/Story/temp/Final_Story.mp4
           retention-days: 7
-
-      # ── 10 ── Telegram
-      - name: ✅ Telegram success
-        if: success()
-        run: |
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
-            -d parse_mode="HTML" \
-            -d text="✅ <b>Sawaj Studio</b> — Video ready! Run #${{ github.run_number }}"
-
-      - name: ❌ Telegram failure
-        if: failure()
-        run: |
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
-            -d parse_mode="HTML" \
-            -d text="❌ <b>Sawaj Studio</b> — FAILED%0A${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
