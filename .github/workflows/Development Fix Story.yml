@@ -1,10 +1,10 @@
-name: ♻️ Step 1 - Restore All Old Folders to Development
+name: ♻️ Restore Development to Commit 93d66a7
 
 on:
   workflow_dispatch:
 
 jobs:
-  restore_old:
+  restore_commit:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Development Repo
@@ -14,18 +14,10 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
 
-      - name: 🔍 Find Commit Before Deployment Deletion & Restore
+      - name: ♻️ Checkout Full Tree from 93d66a7
         run: |
           set -e
-          git log -n 10 --oneline
-          # Find the most recent commit that has API/ or Story/
-          GOOD_COMMIT=$(git rev-list -n 15 HEAD -- API Story Assets Config URL Uploader | head -n 1)
-          echo "Found commit with old folders: $GOOD_COMMIT"
-          if [ -z "$GOOD_COMMIT" ]; then
-            echo "❌ Could not find a commit with old folders in history."
-            exit 1
-          fi
-          git checkout "$GOOD_COMMIT" -- API Assets Config Story URL Uploader .gitignore requirements.txt
+          git checkout 93d66a7 -- .
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git status --short
@@ -33,7 +25,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "ℹ️ Nothing to commit."
           else
-            git commit -m "chore: restore API, Assets, Config, Story, URL, Uploader from $GOOD_COMMIT"
+            git commit -m "chore: restore full project tree from 93d66a7"
             git push
           fi
-          
