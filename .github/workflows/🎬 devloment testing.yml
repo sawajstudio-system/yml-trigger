@@ -1,4 +1,4 @@
-name: 🎬 devloment testing Story
+name: 🎬 SAWAJ STUDIO Story Pipeline
 
 on:
   workflow_dispatch:
@@ -64,45 +64,48 @@ jobs:
       - name: 4. 📥 Install Python Packages
         run: |
           python -m pip install --upgrade pip
-          if [ -f "requirements.txt" ]; then
+          if [ -f "bot/requirements.txt" ]; then
+            pip install -r bot/requirements.txt
+          elif [ -f "requirements.txt" ]; then
             pip install -r requirements.txt
-          elif [ -f "Story/requirements.txt" ]; then
-            pip install -r Story/requirements.txt
           else
             pip install requests edge-tts google-api-python-client google-auth-httplib2 google-auth-oauthlib Pillow mutagen numpy PyYAML
           fi
 
-      - name: 5. 🔍 Verify Structure
+      - name: 5. 🔍 Verify bot/ Structure
         run: |
-          echo "📂 Story files:"
-          find Story -maxdepth 2 -type f | sort
+          echo "📂 provider_1:"
+          find bot/provider_1 -maxdepth 2 -type f | sort
           echo ""
-          echo "📂 Sources files:"
-          find Sources -maxdepth 2 -type f | sort
+          echo "📂 assets_2:"
+          find bot/assets_2 -maxdepth 2 -type f | sort
           echo ""
-          echo "📂 Assets_Config:"
-          ls -la Assets_Config/
+          echo "📂 video_generator_3/story_3:"
+          find bot/video_generator_3/story_3 -maxdepth 2 -type f | sort
+          echo ""
+          echo "📂 upload_4/gdrive_1:"
+          find bot/upload_4/gdrive_1 -maxdepth 2 -type f | sort
 
       - name: 6. 🎬 Run Story Pipeline
-        working-directory: Story
+        working-directory: bot/video_generator_3/story_3/trigger_1
         env:
-          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/Sources:${{ github.workspace }}/Sources/Fallback:${{ github.workspace }}/Sources/Intro:${{ github.workspace }}/Sources/Outro:${{ github.workspace }}/Sources/CTA:${{ github.workspace }}/Assets_Config:${{ github.workspace }}/Story:${{ github.workspace }}/Story/Uploader"
+          PYTHONPATH: "${{ github.workspace }}/bot:${{ github.workspace }}/bot/provider_1/clients_1:${{ github.workspace }}/bot/provider_1/tts_2:${{ github.workspace }}/bot/provider_1/engines_3:${{ github.workspace }}/bot/provider_1/hadith_4:${{ github.workspace }}/bot/provider_1/quran_5:${{ github.workspace }}/bot/provider_1/calendar_6:${{ github.workspace }}/bot/provider_1/filters_7:${{ github.workspace }}/bot/provider_1/glossaries_8:${{ github.workspace }}/bot/provider_1/templates_9:${{ github.workspace }}/bot/provider_1/thumbnails_10:${{ github.workspace }}/bot/provider_1/config_11:${{ github.workspace }}/bot/provider_1/fallback_12:${{ github.workspace }}/bot/assets_2:${{ github.workspace }}/bot/assets_2/fonts_4:${{ github.workspace }}/bot/assets_2/logos_5:${{ github.workspace }}/bot/video_generator_3/story_3/trigger_1:${{ github.workspace }}/bot/video_generator_3/story_3/script_2:${{ github.workspace }}/bot/video_generator_3/story_3/render_3:${{ github.workspace }}/bot/video_generator_3/story_3/outputs_4:${{ github.workspace }}/bot/video_generator_3/story_3/uploader_5:${{ github.workspace }}/bot/upload_4/gdrive_1/story_video_upload_3"
         run: |
-          echo "🚀 Starting Story Pipeline..."
+          echo "🚀 Starting SAWAJ STUDIO Story Pipeline..."
           python -u composer.py
 
       - name: 7. 📤 Check Output
         if: always()
         run: |
-          VIDEO="Story/temp/Final_Story.mp4"
+          VIDEO="bot/video_generator_3/story_3/trigger_1/temp/Final_Story.mp4"
           if [ -f "$VIDEO" ]; then
             echo "✅ VIDEO BANA!"
             du -h "$VIDEO"
           else
             echo "ℹ️ Pipeline completed (temp/ may already be cleaned up after Drive upload)."
-            ls -la Story/ 2>/dev/null || true
+            ls -la bot/video_generator_3/story_3/outputs_4/ 2>/dev/null || true
           fi
 
       - name: 8. 🧹 Cleanup
         if: always()
-        run: rm -rf Story/temp temp 2>/dev/null || true
+        run: rm -rf bot/video_generator_3/story_3/trigger_1/temp bot/assets_2/temp_7/temp temp 2>/dev/null || true
