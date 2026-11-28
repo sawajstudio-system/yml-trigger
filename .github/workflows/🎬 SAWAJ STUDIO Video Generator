@@ -1,0 +1,129 @@
+name: 🎬 SAWAJ STUDIO Video Generator (Long / Short / Story)
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_type:
+        description: "🎥 Kaun sa video banana hai?"
+        required: true
+        default: "story"
+        type: choice
+        options:
+          - story
+          - short
+          - long
+          - all
+
+concurrency:
+  group: sawaj-video-${{ github.event.inputs.video_type || 'story' }}
+  cancel-in-progress: false
+
+jobs:
+  generate_video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      # ── 🟢 CORE & API KEYS ──
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+      # ── ☁️ GOOGLE DRIVE ──
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_LONG_ID: ${{ secrets.GDRIVE_F_LONG_ID }}
+      GDRIVE_F_SHORT_ID: ${{ secrets.GDRIVE_F_SHORT_ID }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+
+      # ── 🧠 AI MODELS ──
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
+      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
+      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
+
+      # ── 🎬 MEDIA & AUDIO ──
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+
+    steps:
+      - name: 1. 📥 Checkout Development Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "${{ github.repository_owner }}/Development"
+          token: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 3. 📦 Install FFmpeg & Fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
+
+      - name: 4. 📥 Install Python Packages
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "bot/requirements.txt" ]; then
+            pip install -r bot/requirements.txt
+          elif [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          else
+            pip install requests edge-tts google-api-python-client google-auth-httplib2 google-auth-oauthlib Pillow mutagen numpy PyYAML
+          fi
+
+      - name: 5. 🎬 Run Selected Video Pipeline (${{ github.event.inputs.video_type || 'story' }})
+        run: |
+          CHOICE="${{ github.event.inputs.video_type || 'story' }}"
+          BASE_PYTHONPATH="${{ github.workspace }}/bot:${{ github.workspace }}/bot/provider_1/clients_1:${{ github.workspace }}/bot/provider_1/tts_2:${{ github.workspace }}/bot/provider_1/engines_3:${{ github.workspace }}/bot/provider_1/hadith_4:${{ github.workspace }}/bot/provider_1/quran_5:${{ github.workspace }}/bot/provider_1/calendar_6:${{ github.workspace }}/bot/provider_1/filters_7:${{ github.workspace }}/bot/provider_1/glossaries_8:${{ github.workspace }}/bot/provider_1/templates_9:${{ github.workspace }}/bot/provider_1/thumbnails_10:${{ github.workspace }}/bot/provider_1/config_11:${{ github.workspace }}/bot/provider_1/fallback_12:${{ github.workspace }}/bot/display_assets_2:${{ github.workspace }}/bot/display_assets_2/fonts_4:${{ github.workspace }}/bot/display_assets_2/logos_5"
+
+          run_mode() {
+            MODE_FOLDER="$1"
+            UPLOAD_FOLDER="$2"
+            echo "=========================================="
+            echo "🚀 Starting Pipeline: $MODE_FOLDER"
+            echo "=========================================="
+            MODE_DIR="${{ github.workspace }}/bot/video_generator_3/$MODE_FOLDER"
+            export PYTHONPATH="$BASE_PYTHONPATH:$MODE_DIR/trigger_1:$MODE_DIR/script_2:$MODE_DIR/render_3:$MODE_DIR/outputs_4:$MODE_DIR/uploader_5:${{ github.workspace }}/bot/upload_4/gdrive_1/$UPLOAD_FOLDER"
+            (cd "$MODE_DIR/trigger_1" && python -u composer.py)
+          }
+
+          if [ "$CHOICE" = "long" ] || [ "$CHOICE" = "all" ]; then
+            run_mode "long_1" "long_video_upload_1"
+          fi
+
+          if [ "$CHOICE" = "short" ] || [ "$CHOICE" = "all" ]; then
+            run_mode "short_2" "short_video_upload_2"
+          fi
+
+          if [ "$CHOICE" = "story" ] || [ "$CHOICE" = "all" ]; then
+            run_mode "story_3" "story_video_upload_3"
+          fi
+
+      - name: 6. 📤 Check Outputs
+        if: always()
+        run: |
+          echo "📂 Long Outputs:" && ls -lh bot/video_generator_3/long_1/outputs_4/ 2>/dev/null || true
+          echo "📂 Short Outputs:" && ls -lh bot/video_generator_3/short_2/outputs_4/ 2>/dev/null || true
+          echo "📂 Story Outputs:" && ls -lh bot/video_generator_3/story_3/outputs_4/ 2>/dev/null || true
+
+      - name: 7. 🧹 Cleanup Temp Files
+        if: always()
+        run: |
+          rm -rf bot/video_generator_3/long_1/trigger_1/temp \
+                 bot/video_generator_3/short_2/trigger_1/temp \
+                 bot/video_generator_3/story_3/trigger_1/temp \
+                 bot/display_assets_2/temp_7/temp temp 2>/dev/null || true
